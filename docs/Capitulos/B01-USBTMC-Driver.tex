@@ -1,0 +1,172 @@
+\chapter[USB TMC Driver]{USB TMC Driver}
+\label{cp:USBTMC-Driver}
+
+\section*{Resumen}
+Estoy usando la librería de ESP-IDF para implementar el driver USB TMC. Esta librería permite la comunicación con dispositivos USB a través de la interfaz TMC (Test and Measurement Class) pero no esta completamente implementada en el framework de ESP-IDF. La implementación se basa en TinyUSB, una librería de código abierto para la comunicación USB en microcontroladores en la que si esta completamente implementada la Clase TMC. La implementación tambien incluye la creacion de una interfaz estandar para darle al motor SCPI un aapi estandarizada para la comunicación con el driver USB TMC y cualquier otro que se quiera implementar en el futuro.
+
+\section{Implementación del driver USB TMC en ESP-IDF}
+Como en la librería de ESP-IDF no esta completamente implementada la Clase TMC, debemos agregar a mano los descriptores de la clase TMC y agregarlos con la función de inicialización
+\begin{minted}{c}
+    /**
+    * @brief Install the TinyUSB device driver and start the TinyUSB task.
+    *
+    * This helper configures the USB PHY when requested, prepares descriptors,
+    * initializes the TinyUSB stack, and starts the TinyUSB task.
+    *
+    * @note When supplying a custom composite device descriptor with an Interface
+    *       Association Descriptor, keep `bDeviceClass` as `TUSB_CLASS_MISC` and
+    *       `bDeviceSubClass` as `MISC_SUBCLASS_COMMON`.
+    *
+    * @param[in] config TinyUSB stack configuration.
+    *
+    * @return
+    *      - ESP_OK on success
+    *      - ESP_ERR_INVALID_ARG if `config` is NULL or contains unsupported port or task settings
+    *      - ESP_ERR_INVALID_STATE if the TinyUSB device task is already running
+    *      - ESP_ERR_NO_MEM if memory allocation fails during startup
+    *      - Other error codes from TinyUSB task startup, USB PHY setup, or descriptor setup
+    */
+    esp_err_t tinyusb_driver_install(const tinyusb_config_t *config);
+\end{minted}
+
+\section{Descriptores de la clase TMC}
+
+
+\subsection{Descriptor del dispositivo}
+\begin{minted}{c}
+    tusb_desc_device_t const desc_device = {
+        .bLength = sizeof(tusb_desc_device_t),
+        .bDescriptorType = TUSB_DESC_DEVICE,
+        .bcdUSB = 0x0200,
+        .bDeviceClass = TUD_USBTMC_CLASS,           // 0x01 para descriptor de de tipo dispositivo
+        .bDeviceSubClass = TUD_USBTMC_SUBCLASS,     // 0xFE
+        .bDeviceProtocol = TUD_USBTMC_PROTO_488,    // 0x03
+        .bMaxPacketSize0 = CFG_TUD_ENDPOINT0_SIZE,  // 64 bytes para maximo tamaño de paquete de control
+
+        .idVendor = USB_VID,                        // 0x16C0
+        .idProduct = USB_PID,                       // 0x2044
+        .bcdDevice = USB_BCD,                       // 0x0100
+
+        .iManufacturer = 0x01, // Índice del string del fabricante
+        .iProduct = 0x02,      // Índice del string del producto
+        .iSerialNumber = 0x03, // Índice del string del número de serie
+        .bNumConfigurations = 0x01};
+\end{minted}
+
+\subsection{Descriptor de configuración}
+
+\subsection{Descriptor de interfaz}
+\subsection{Descriptopres de cadenas de caracteres}
+
+\section{Callbacks weaks implementadios en TinyUSB para acceso al stack de USB}
+Tenemos que al menos implementar los callbacks de TinyUSB para poder acceder al stack de USB y poder enviar y recibir datos a traves de la interfaz TMC. Estos callbacks son:
+\begin{minted}{c}
+    // 2. Callback de apertura (Requerido para inicializar el bus)*
+    void tud_usbtmc_open_cb(uint8_t interface_id);
+    // 3. Callback de recepción de mensajes BULK
+    bool tud_usbtmc_msgBulkOut_start_cb(usbtmc_msg_request_dev_dep_out const *msgHeader)
+    // 4. Callback de datos recibidos
+    bool tud_usbtmc_msg_data_cb(void *data, size_t len, bool transfer_complete);
+    // 5. Callback de petición BULK IN (El host pide datos)*
+    bool tud_usbtmc_msgBulkIn_request_cb(usbtmc_msg_request_dev_dep_in const *request);
+    // 6. Callback de finalización BULK IN*
+    bool tud_usbtmc_msgBulkIn_complete_cb(void);
+    // 7. Callback para el STATUS BYTE (IEEE 488) - CRITICO PARA SCPI
+    uint8_t tud_usbtmc_get_stb_cb(uint8_t *tmcResult);
+    // 8. Callback para el TRIGGER (Ejemplo: comando *TRG o señal GET)
+    bool tud_usbtmc_msg_trigger_cb(usbtmc_msg_generic_t *msg);
+    // 9. Clear Feature Bulk OUT
+    void tud_usbtmc_bulkOut_clearFeature_cb(void);
+    // 10. Clear Feature Bulk IN
+    void tud_usbtmc_bulkIn_clearFeature_cb(void);
+    // 11. Initiate Abort Bulk OUT
+    bool tud_usbtmc_initiate_abort_bulk_out_cb(uint8_t *tmcResult);
+    // 12. Check Abort Bulk OUT
+    bool tud_usbtmc_check_abort_bulk_out_cb(usbtmc_check_abort_bulk_rsp_t *rsp);
+    // 13. Initiate Abort Bulk IN
+    bool tud_usbtmc_initiate_abort_bulk_in_cb(uint8_t *tmcResult);
+    // 14. Check Abort Bulk IN
+    bool tud_usbtmc_check_abort_bulk_in_cb(usbtmc_check_abort_bulk_rsp_t *rsp);
+    // 15. Initiate Clear
+    bool tud_usbtmc_initiate_clear_cb(uint8_t *tmcResult);
+    // 16. Check Clear
+    bool tud_usbtmc_check_clear_cb(usbtmc_get_clear_status_rsp_t *rsp);
+\end{minted}
+
+\section{Máquina de estados para la comunicación}
+La maquina de estados es minimalista, tiene 4 estados principales: 
+\begin{minted}{c}
+    typedef enum
+    {
+        STATE_TMC_IDLE,
+        STATE_TMC_RECEIVING,
+        STATE_TMC_PROCESSING,
+        STATE_TMC_REPLY_READY
+    } usb_tmc_state_t;
+\end{minted}
+
+Esta maquina puede controlar 5 eventos del host y 1 del SCPI:
+\begin{minted}{c}
+    typedef enum
+    {
+        EV_TMC_RX_START,   // Inicia recepción (Bulk OUT)
+        EV_TMC_RX_CHUNK,   // Llega un pedazo de datos
+        EV_TMC_RX_END,     // Llega el final del mensaje
+        EV_TMC_TX_REQ,     // Host pide leer (Bulk IN)
+        EV_TMC_TX_DONE,    // Host terminó de leer
+        EV_TMC_SCPI_DONE   // libscpi no encontró query
+    } usb_tmc_event_t;
+\end{minted}
+
+\subsection{STATE\_TMC\_IDLE}
+\subsubsection*{Eventos controlados esperados}
+En el primer estado \textbf{STATE\_TMC\_IDLE}, solo hay un evento esperado: \textbf{EV\_TMC\_RX\_START}.
+
+Cuando el host envía un mensaje, se genera el evento \textbf{EV\_TMC\_RX\_START} y la FSM pasa al estado \textbf{STATE\_TMC\_RECEIVING}.
+
+\subsubsection*{Eventos controlados no esperados}
+EL evento \textbf{EV\_TMC\_TX\_REQ} aparece cuando el host hacer bulk-in (pedido de datos) sin antes hacer una consulta genera un evento \textbf{Error -420: Query Unterminated"} que debemos informar a libscpi para que lo registre. Luego responderemos con un NAK/Empty al host para que continue sin esperar la respuesta. Como la unica forma de llegar a \textbf{STATE\_TMC\_IDLE} es que un mensage no genere respuesta o que la respuesta anterior ya haya sido enviada, no hay forma de que en este estado sea correcto un pedido de datos si no es por un error del usuario/host.
+\todo{falta controlar eventos de desconecion de la interfaz}
+
+\subsection{STATE\_TMC\_RECEIVING}
+\subsubsection*{Eventos controlados esperados}
+En este estado solo existen 2 eventos esperados: \textbf{EV\_TMC\_RX\_CHUNK} y \textbf{EV\_TMC\_RX\_END}.
+Despues de iniciada una recepción los datos pueden llegar en una sola transferencia, si entran en el endpoint del usb que tiene un tamaño de 64 bytes, o pueden llegar en varios fragmentos si el mensaje es mas largo. 
+Cada vez que llega un fragmento de datos se genera el evento \textbf{EV\_TMC\_RX\_CHUNK} y la FSM permanece en el estado \textbf{STATE\_TMC\_RECEIVING}. 
+Cuando llega el final del mensaje se genera el evento \textbf{EV\_TMC\_RX\_END} y la FSM pasa al estado \textbf{STATE\_TMC\_PROCESSING}. En este evento es fundamental informar que hay un nuevo mensaje y actualizar el status bytes. Si los mensajes se introducen en una cola se pasa al siguiente, si hay un buffer doble se cambia el buffer.
+
+\subsubsection*{Eventos controlados no esperados}
+\todo{falta controlar eventos de desconecion de la interfaz}
+
+\subsection{STATE\_TMC\_PROCESSING}
+\subsubsection{Eventos controlados esperados}
+Aqui solo hay un evento esperado: \textbf{EV\_TMC\_SCPI\_DONE}, que se genera cuando libscpi termina de procesar el mensaje recibido. En este mensaje pueden venir desde ninguna a muchas consultas así que la maquina de estados debe revisar el stream de salida para verificar si hay datos disponibles y la FSM pasa al estado \textbf{STATE\_TMC\_REPLY\_READY} o si no hay datos disponibles volver a \textbf{STATE\_TMC\_IDLE}.
+
+\subsubsection{Eventos controlados no esperados}
+En este estado el motor scpi puede tardar algo de tiempo en procesar el mensaje recibido. Si el host envia una nueva consulta generardo un evento de tipo \textbf{EV\_TMC\_RX\_START} antes de que libscpi termine de procesar el mensaje, se genera un evento \textbf{Error -410: Query Interrupted} que debemos informar a libscpi para que lo registre y no envie la respuesta al buffer de salida. Tambien se debe reconfigurar la FSM volviendo al estado \textbf{STATE\_TMC\_RECEIVING} para recibir el nuevo mensaje. Finalmente se debe descartar cualquier respuesta que este en el buffer de salida, lo que se hace limpiando el stream buffer de salida \textbf{EV\_TMC\_SCPI\_DONE}.
+
+\subsection{STATE\_TMC\_REPLY\_READY}
+\subsubsection{Eventos controlados esperados}
+En este estado hay 2 eventos esperados posibles: \textbf{EV\_TMC\_TX\_REQ} y \textbf{EV\_TMC\_TX\_DONE}. Cuando el host solicita leer, se genera el evento \textbf{EV\_TMC\_TX\_REQ} y la FSM envia los datos al host. Cuando el host termina de leer, se genera el evento \textbf{EV\_TMC\_TX\_DONE} y la FSM vuelve al estado \textbf{STATE\_TMC\_IDLE}.
+
+\subsubsection{Eventos controlados no esperados}
+Aqui nuevamente se puede generar un evento inesperado si el host envia una nueva consulta generardo un evento de tipo \textbf{EV\_TMC\_RX\_START} antes de que el host termine de leer la respuesta. Esto genera un evento \textbf{Error -410: Query Interrupted} que debemos informar a libscpi para que lo registre e impida el envio de nuevos datos hasta que comience el proceso del nuevo mensaje. Tambien se debe reconfigurar la FSM volviendo al estado \textbf{STATE\_TMC\_RECEIVING} para recibir el nuevo mensaje. Finalmente es importante abortar la transmision de datos al host y limpiar el buffer de salida.
+
+\section{Control de exepciones}
+\subsection{Error -350: Overflow}
+Este evento se produce cuando la cola de mensajes o la memoria del stream buffer se llena, en ese caso para reportar el error el driver enviará un mensaje vacio marcado con el error -350.
+
+\subsection{Error -410: Query Interrupted}
+Como vimos en la seccion anterior este evento puede ocurrir en 2 momentos y la respuesta es exactamente la misma: abortar cualquier transmision/generacion de datos de consultas y comenzar a leer el proximo mensaje.
+
+Evidentemente el driver no tiene prioridad ni control del motor scpi para interrumpirlo ya que funcionan en contextos diferentes por lo tanto el el driver solo puede:
+En el contexto de recepcion USBTMC: 
+\begin{itemize}
+    \item Bórrar cualquier mensaje listo para ser enviado vaciando el buffer de salida.
+    \item Marca el ultimo mensaje enviado con el error -410.
+    \item Iniciar un nuevo mensaje. 
+    \item Pasar la maquina de estados a \textbf{STATE\_TMC\_RECEIVING}.
+\end{itemize}
+
+\subsection{Error -420: Query Unterminated}
+Este evento se produce cuando el host pide datos y no hay nada para enviar, en ese caso para reportar el error el driver enviará un mensaje vacio marcado con el error -420.

@@ -1,0 +1,29 @@
+# Documentation build artifacts
+!build/main.pdf
+build/
+./**/*.log
+./**/*.aux
+./**/*.toc
+./**/*.out
+./**/*.lof
+./**/*.lot
+./**/*.fls
+./**/*.fdb_latexmk
+./**/*.synctex.gz
+./**/*.bcf
+./**/*.run.xml
+./**/*.acr
+./**/*.alg
+./**/*.glg
+./**/*.glo
+./**/*.gls
+./**/*.slg
+./**/*.sls
+./**/*.blg
+./**/*.bbl
+./**/*.ist
+
+# IDE
+.vscode/
+.settings/
+*.code-workspace

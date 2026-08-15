@@ -1,0 +1,18 @@
+\thispagestyle{plain}
+\chapter[Historial de Versiones]{Historial de Versiones}
+\label{cp:historialVersiones}
+
+Para no tener un documento gigante cada vez que alguien quiere corregir el procedimiento de cambios es.
+\begin{enumerate}
+    \item Se debe reemplazar la parte del documento que se cambió.
+    \item Agregar una nota a este historial de cambios en esta sección con la fecha del cambio y una pequeña referencia de la sección actualizada.
+    \item Hacer el commit con la actualización igual a la del historial del documento actualizado y pushearlo al remoto.
+\end{enumerate}
+Si los cambios son muy grandes se recomienda crear una rama nueva del documento antes de hacer el pull y el merge.
+
+\section{Historial de cambios:}
+\begin{itemize}
+    \item \textbf{ 6 de agosto del 2026:} Documento original. 
+    \item \textbf{ 10 de agosto del 2026:} Despues de leer mejor el estandar se cambio la FSM del driver y engine para solo descartar mensajes ante un queie interrupted.
+    \item \textbf{ 11 de agosto del 2026:} NUEVA RAMA. Para acelerar el desarropllo y asegurar baja latencia de comunicación, se elimino las interfaces que separan tares dde driver y procesamiento. el driver procesa en su tarea y contexto los mensajes. 
+\end{itemize}

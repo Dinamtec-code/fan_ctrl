@@ -1,0 +1,140 @@
+\documentclass[
+    language=spanish,
+    school=esdf,
+    docstage=final,
+    media=paper,
+    bookprint=false,
+    linkcolor=red!45!black,
+    chapterstyle=classic,
+    coverstyle=classic,
+    aiacknowledgement=true,
+    listprefix=false
+]{IPLeiriaThesis}
+
+%%% =========================================================
+%%% DOCUMENT VERSION
+%%% =========================================================
+
+\DocumentVersion{1.0.0}
+
+%%% =========================================================
+%%% METADATA
+%%% =========================================================
+
+\input{Metadata/Metadata}
+
+%%% =========================================================
+%%% PACKAGES ADICIONALES
+%%% =========================================================
+
+\usepackage{datetime2}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{float}
+\usepackage{siunitx}
+\usepackage{listings}
+\usepackage{tikz}
+\usepackage{todonotes}
+\usepackage{minted}
+\usetikzlibrary{positioning, babel}
+
+%%% =========================================================
+%%% GLOSARIO Y ACRÓNIMOS
+%%% =========================================================
+
+\makeglossaries
+\loadglsentries{Matter/04-Glossary}
+\loadglsentries[\acronymtype]{Matter/05-Acronyms}
+\loadglsentries[\symboltype]{Matter/06-Symbols}
+
+
+%%% =========================================================
+%%% DOCUMENT START
+%%% =========================================================
+
+\begin{document}
+
+%%% =========================================================
+%%% FRONT MATTER
+%%% =========================================================
+
+\include{Matter/00-Cubierta}
+\include{Matter/01-Primera-Pagina}
+\include{Matter/02-Copyright}
+
+\pagenumbering{roman}
+
+%\include{Matter/03-Agradecimientos}
+%\include{Capitulos/00-Resumen}
+
+%%% Table of Contents, List of Figures and List of Tables %%%
+\bookmarktocentry\tableofcontents
+\listoffigures
+\listoftables
+
+%%% Print: Glossary and Acronyms %%%
+\glossarytoc\printnormalglossary
+\acronymtoc\printacronymglossary
+\symboltoc\printsymbolglossary
+
+%%% Arabic Numeration %%%
+\pagenumbering{arabic}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% BLOQUE A — Estado consolidado
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\part{Estado del proyecto}
+
+\include{Capitulos/A01-Estado-actual}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% BLOQUE B — Cuaderno de desarrollo
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\part{Cuaderno del proyecto}
+
+\include{Capitulos/B01-USBTMC-Driver}
+\include{Capitulos/B02-Motor-SCPI}
+\include{Capitulos/B03-LibSCPI}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% BLOQUE C — VERSIONADO DEL DOCUMENTO
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\part{Gestión de Versiones del Documento}
+
+\include{Capitulos/C01-Historial-Versiones}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% BIBLIOGRAFÍA
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\renewcommand{\refname}{Bibliography}
+\printbibliography[title={\refname},heading=bibintoc]
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% APÉNDICES técnicos (derivaciones y resultados seleccionados)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\appendix
+\setcounter{chapter}{0} % Reinicia el contador para que empiece en A
+\renewcommand{\thechapter}{\Alph{chapter}} % Asegura el formato de letra mayúscula
+
+\input{Matter/07-Apendices}
+\input{Capitulos/Apendices/00-AppendixA}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% ANEXOS (FUENTES EXTERNAS)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\input{Matter/08-Anexos}
+
+\include{Capitulos/Anexos/Datasheets}
+\include{Capitulos/Anexos/Notas-Aplicacion}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% BACK PAGE
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\input{Matter/09-Back-Page}
+
+\end{document}

@@ -1,0 +1,18 @@
+\ifthenelse{\equal{\MediaOption}{paper}}{\blankpage}{}
+
+\clearpage
+\null
+\thispagestyle{empty}
+
+\newcommand\BackgroundPicBackPage{%
+	\put(0,0){%
+		\parbox[b][\paperheight]{\paperwidth}{%
+			\vfill
+			\centering
+			\includegraphics[width=\paperwidth,height=\paperheight,keepaspectratio]{Figuras/Theme/contratapa-reporte-interno.pdf}%
+			\vfill
+		}}}
+\AddToShipoutPictureBG*{\BackgroundPicBackPage}
+
+
+\restoregeometry

@@ -1,0 +1,24 @@
+\pagenumbering{gobble} % Prevent page numbering.
+
+\vspace*{\fill}
+
+\ifthenelse{\equal{\LanguageOption}{spanish}}{%
+    \noindent \textbf{\GetTitle}
+    
+    \noindent Copyright \textcopyright~\the\year{} - \GetFirstAuthor, \GetSchool.
+    
+    \vspace{.575em}
+    
+    \noindent Este documento es de uso interno y ha sido elaborado exclusivamente como referencia técnica sobre el desarrollo de una interfaz usb robusta para los equipos usados en los laboratorios de enseñanza del Departamento de Física.
+}{%
+    \noindent \textbf{\GetTitle}
+    
+    \noindent Copyright \textcopyright~\the\year{} - \GetFirstAuthor, \GetSchool.
+    
+    \vspace{.575em}
+    
+    \noindent This document is for internal use and has been prepared exclusively as a technical reference regarding the development of a robust USB interface for the equipment used in the Physics Department's teaching laboratories.
+}
+
+\vspace*{\fill}
+\MediaOptionLogic

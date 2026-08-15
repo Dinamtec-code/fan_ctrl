@@ -1,0 +1,13 @@
+idf_component_register(
+    SRCS 
+    "src/hmi_display_task.c" 
+    "src/hmi_ui.c"
+    "src/verdana_pro_semi_bold_14_glyph.c"
+    "src/verdana_pro_semi_bold_16_glyph.c"
+    "src/verdana_pro_semi_bold_18_glyph.c"
+    "src/verdana_pro_semi_bold_20_glyph.c"
+    "src/verdana_pro_semi_bold_40_glyph.c"
+
+    INCLUDE_DIRS "include"
+    REQUIRES freertos driver esp_lcd esp_lvgl_port lvgl espressif__esp_lcd_ili9341
+)

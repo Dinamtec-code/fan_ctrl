@@ -1,0 +1,30 @@
+INFO:  latexindent.EXE version 3.24.7, 2025-08-15, a script to indent .tex files
+       latexindent.EXE lives here: C:/texlive/2025/bin/windows/
+       Mon Apr 20 17:06:14 2026
+       Filename: E:\Users\damian\Proyectos\Amplificador-lineal-de-potencia\docs\Matter\04-Glossary.tex
+INFO:  Processing switches:
+       -s|--silent: Silent mode active (you have used either -s or --silent)
+       -w|--overwrite: Overwrite mode active, will make a back up before overwriting
+INFO:  Directory for backup files and log file indent.log:
+       E:\Users\damian\Proyectos\Amplificador-lineal-de-potencia\docs\Matter
+INFO:  YAML settings read: defaultSettings.yaml
+       Reading defaultSettings.yaml from C:/texlive/2025/bin/windows/defaultSettings.yaml
+       Reading defaultSettings.yaml (2nd attempt) from C:/texlive/2025/bin/windows/../../texmf-dist/scripts/latexindent/defaultSettings.yaml
+       and then, if necessary, C:/texlive/2025/bin/windows/LatexIndent/defaultSettings.yaml
+INFO:  YAML reading settings
+       Home directory is E:\Users\damian
+       latexindent.pl didn't find indentconfig.yaml or .indentconfig.yaml
+       see all possible locations: https://latexindentpl.readthedocs.io/en/latest/sec-appendices.html#indentconfig-options)
+INFO:  Backup procedure (-w flag active):
+       E:\Users\damian\Proyectos\Amplificador-lineal-de-potencia\docs\Matter\04-Glossary.bak0 already exists, incrementing by 1 (see maxNumberOfBackUps)
+       Backing up E:\Users\damian\Proyectos\Amplificador-lineal-de-potencia\docs\Matter\04-Glossary.tex to E:\Users\damian\Proyectos\Amplificador-lineal-de-potencia\docs\Matter\04-Glossary.bak1...
+       E:\Users\damian\Proyectos\Amplificador-lineal-de-potencia\docs\Matter\04-Glossary.tex will be overwritten after indentation
+INFO:  Phase 1: searching for objects
+INFO:  Phase 2: finding surrounding indentation
+INFO:  Phase 3: indenting objects
+INFO:  Phase 4: final indentation check
+INFO:  Output routine:
+       Overwriting file E:\Users\damian\Proyectos\Amplificador-lineal-de-potencia\docs\Matter\04-Glossary.tex
+       --------------
+INFO:  Please direct all communication/issues to:
+        https://github.com/cmhughes/latexindent.pl
