@@ -35,8 +35,6 @@ ctrl_param_t kd[CTRL_NUM_CHANNELS] = {
     {.value = 0.0f, .max = 100.0f, .min = 0.0f}
 };
 
-static float speed_history_buffer[SPEED_BUFFER_SIZE] = {0};
-static float duty_history_buffer[SPEED_BUFFER_SIZE]  = {0};
 
 /* --- Generic Parameter Helpers --- */
 

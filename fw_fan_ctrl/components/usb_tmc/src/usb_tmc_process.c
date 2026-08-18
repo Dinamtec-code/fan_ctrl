@@ -166,7 +166,7 @@ static scpi_result_t cmd_pid_kp(scpi_t *context)
     }
 
     // 3. Extraer el parámetro enviado por el usuario
-    if (!SCPI_ParamFloat(context, &setpoint, TRUE))
+    if (!SCPI_ParamFloat(context, &kp, TRUE))
     {
         return SCPI_RES_ERR;
     }
@@ -212,7 +212,7 @@ static scpi_result_t cmd_pid_ki(scpi_t *context)
     }
 
     // 3. Extraer el parámetro enviado por el usuario
-    if (!SCPI_ParamFloat(context, &setpoint, TRUE))
+    if (!SCPI_ParamFloat(context, &ki, TRUE))
     {
         return SCPI_RES_ERR;
     }
@@ -256,7 +256,7 @@ static scpi_result_t cmd_pid_kd(scpi_t *context)
         return SCPI_RES_ERR;
     }
 
-    if (!SCPI_ParamFloat(context, &setpoint, TRUE))
+    if (!SCPI_ParamFloat(context, &kd, TRUE))
     {
         return SCPI_RES_ERR;
     }
@@ -335,9 +335,8 @@ static scpi_result_t cmd_pid_type(scpi_t *context){
 static scpi_result_t cmd_sour_outp_q(scpi_t *context)
 {
     int32_t channel;
-    float kd;
 
-    SCPI_CommandNumbers(context, &channel, 1, 1);
+    SCPI_CommandNumbers(context, &channel, 1, 1); 
 
     if (channel < 1 || channel > 2)
     {
@@ -351,7 +350,7 @@ static scpi_result_t cmd_sour_outp_q(scpi_t *context)
 
 static scpi_result_t cmd_sour_outp(scpi_t *context)
 {
-    uint32_t channel;
+    int32_t channel;
     scpi_bool_t on;
 
     SCPI_CommandNumbers(context, &channel, 1, 1);
