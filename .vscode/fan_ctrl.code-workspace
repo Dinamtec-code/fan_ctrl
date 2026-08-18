@@ -1,0 +1,21 @@
+{
+"folders": [
+	{
+		"name": "Firmware",
+		"path": "..\\fw_fan_ctrl"
+	},
+	{
+		"name": "Mecánica",
+		"path": "..\\mecanica"
+	},
+	{
+		"name": "Electrónica",
+		"path": "..\\electronica"
+	},
+	{
+		"name": "Documentación",
+		"path": "..\\docs"
+	}
+],
+	"settings": {}
+}

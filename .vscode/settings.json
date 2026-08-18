@@ -1,0 +1,4 @@
+{
+    "idf.currentSetup": "E:\\esp\\v6.0.2\\esp-idf",
+    "idf.projectPath": "${workspaceFolder}\\fw_fan_ctrl"
+}

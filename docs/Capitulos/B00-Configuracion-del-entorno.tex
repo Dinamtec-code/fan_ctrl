@@ -1,0 +1,52 @@
+\chapter[Desarrollo]{Desarrollo}
+
+\section{Configuración del entorno de trabajo}
+\subsection{Documentación}
+La documentación está escrita en latex con una variante de \textbf{IPLeiriaThesis} usando Visual Studio Code como IDE con el complemento de \textbf{LaTex Workshop}. El framework está escrito para ser compilado con \textbf{XeLatex} o en su defecto \textbf{LuaLatex}.
+
+La estuctura de la documentación será 3 capitulos conteniendo:
+\begin{itemize}
+    \item Parte 1: Manual de usuario.
+    \item Parte 2: Cuaderno de desarrollo.
+    \item Parte 3: Historial de cambios.
+\end{itemize}
+
+\subsection{Firmware}
+El equipo tiene un micronontrolador \textbf{ESP32-S3} por lo que todo el firmware está en un solo proyecto de ESPIDF.
+
+Los complementos necesarios para programar el microcontrolador con todas las funcionalidades usadas es:
+\begin{itemize}
+    \item Complemento de vscode ESP-IDF v2.2.0
+    \item Framework ESP-IDF v6.0.2
+    \item Complementos
+    \begin{itemize}
+        \item esp\_\_lcd\_ili9341
+        \item esp\_\_lvgl\_port
+        \item esp\_\_tinyusb
+        \item tinyusb
+    \end{itemize}
+\end{itemize}
+
+Para instalar los complementos usar desde la terminal de esp-idf (entorno virtual):
+\begin{itemize}
+    \item \texttt{idf.py add-dependency "espressif/esp_lcd_ili9341} Para controlar el diaplay.
+    \item \texttt{idf.py add-dependency espressif/esp_lvgl_port} Para controlar los graficos.
+    \item \texttt{idf.py add-dependency "espressif/esp_tinyusb"} Para controlar a bajo nivel el USB.
+\end{itemize}
+
+\paragraph{Configuración adicional} Ademas de instalar tinyUSB, como se usa USB TMC y esta clase no está completamente implementada en ESP-IDF en la version 6.0.2, se deben agragar directivas al CMAKE para que tengan mayor prioridad a las configuraciones del framework y los #define. en el \texttt{.\\CMakeLists.txt} del raiz se deben agrafar la sdirectivas.
+
+\begin{minted}{c}
+cmake_minimum_required(VERSION 3.22)
+
+add_compile_definitions(
+    CFG_TUD_USBTMC=1
+    CFG_TUSB_CONFIG_FILE="usb_tmc_config.h" 
+)
+include_directories("components/usb_tmc/include")
+
+include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+idf_build_set_property(COMPILE_DEFINITIONS "CFG_TUD_TMC=1" APPEND)
+
+project(firmaware_control_ventilador)
+\end{minted}

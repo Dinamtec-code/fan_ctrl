@@ -1,0 +1,9 @@
+idf_component_register(
+    SRCS 
+    "src/controller_data.c"
+    "src/controller_pid.c"
+    "src/controller_task.c"
+
+    INCLUDE_DIRS "include"
+    REQUIRES freertos driver 
+)

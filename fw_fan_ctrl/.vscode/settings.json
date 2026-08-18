@@ -1,18 +1,15 @@
 {
-  "C_Cpp.intelliSenseEngine": "default",
-  "idf.extensionActivationMode": "always",
-  "idf.openOcdConfigs": [
-    "board/esp32s3-builtin.cfg"
-  ],
-  "idf.portWin": "COM7",
   "idf.currentSetup": "E:\\esp\\v6.0.2\\esp-idf",
-  "idf.customExtraVars": {
-    "IDF_TARGET": "esp32s3"
-  },
+  "idf.portWin": "COM7",
+  "idf.openOcdConfigs": [
+    "interface/ftdi/esp_ftdi.cfg",
+    "target/esp32s3.cfg"
+  ],
+  "idf.flashType": "UART",
   "clangd.path": "C:\\Espressif\\tools\\esp-clang\\esp-20.1.1_20250829\\esp-clang\\bin\\clangd.exe",
   "clangd.arguments": [
     "--background-index",
     "--query-driver=**",
-    "--compile-commands-dir=e:\\Users\\damian\\Proyectos\\Control_Ventilador\\control_pid_ventilador_con_pantalla\\firmaware_control_ventilador\\build"
+    "--compile-commands-dir=e:\\Users\\damian\\Proyectos\\Control_Ventilador\\fan_ctrl\\fw_fan_ctrl\\build"
   ]
 }

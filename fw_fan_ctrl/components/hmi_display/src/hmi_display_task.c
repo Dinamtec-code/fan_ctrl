@@ -12,6 +12,7 @@
 #include "hmi_display.h"
 #include "hmi_ui.h"
 #include "esp_heap_caps.h"
+#include "usb_tmc_process.h"
 
 // --- Definición de Pines (Ajusta según tu placa) ---
 #define LCD_HOST SPI2_HOST
@@ -26,7 +27,7 @@
 #define LCD_PIN_NUM_CS 10
 
 // 1. Definir el tamaño en BYTES (En ESP-IDF, el stack se mide en bytes, no en words)
-#define DISPLAY_TASK_STACK_SIZE 16 * 1024
+#define DISPLAY_TASK_STACK_SIZE 8 * 1024
 
 // 2. Reservar la memoria estáticamente (BSS) en la SRAM interna
 // StackType_t en el port de ESP-IDF equivale a uint8_t
@@ -37,21 +38,8 @@ TaskHandle_t x_ui_displayTaskHandle = NULL;
 // Variables globales para la UI
 lv_disp_t *lcd_disp = NULL;
 
-void hmi_display_init(void)
-{
-    xTaskCreatePinnedToCore(
-        display_task,
-        "Display_Task",
-        2 * 8192,
-        NULL,
-        5, // Prioridad 5 (Deja prioridades más altas para TinyUSB si es necesario)
-        NULL,
-        1 // Anclado al Core 1 (PRO_CPU es 0, APP_CPU es 1)
-    );
-}
-
 // --- Tarea principal del Display ---
-void display_task(void *pvParameter)
+void display_init(void)
 {
     // 1. Encender la retroiluminación (Backlight)
     gpio_set_direction(LCD_PIN_NUM_BK_LIGHT, GPIO_MODE_OUTPUT);
@@ -139,6 +127,7 @@ void display_task(void *pvParameter)
         &x_ui_displayTaskBuffer, // Estructura estática para el TCB
         1                        // Anclado al Core 1 (APP_CPU)
     );
+
     // 8. Una vez configurado el display, la tarea de inicialización puede destruirse.
     // esp_lvgl_port se encarga de ejecutar la tarea del handler de LVGL internamente.
     vTaskDelete(NULL);
@@ -176,6 +165,8 @@ void ui_task(void *pvParameter)
         }
 
         ui_update_values(speed, dut);
+        ui_update_error_mark(tmc_scpi_has_errors());
+        ui_update_remote_mark(tmc_scpi_has_connected());
 
         vTaskDelay(pdMS_TO_TICKS(50));
     }

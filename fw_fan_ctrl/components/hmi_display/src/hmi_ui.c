@@ -15,6 +15,12 @@ lv_obj_t *label_set_kd_value;
 lv_obj_t *label_min_d_value;
 lv_obj_t *label_max_d_value;
 lv_obj_t *label_out_state;
+lv_obj_t *label_controller_type;
+lv_obj_t *label_encoder_type;
+lv_obj_t *label_encoder_resolution;
+lv_obj_t *label_com_iface;
+lv_obj_t *label_remote_state;
+lv_obj_t *label_error_state;
 
 // --- Colores ---
 #define COLOR_RED_OUT_ON lv_color_hex(0xFF5000)
@@ -76,9 +82,8 @@ void ui_init(void)
 
     /**************************************************************************
      * SECCIÓN 2: BARRA INFERIOR DE ESTADO
-     *
      **************************************************************************/
-    const char *status_items[] = {"PID", "2ppr", "", "", "REM", "ERR"};
+    const char *status_items[] = {"PID", "QUAD", "2ppr", "USB", "", ""};
     int box_w = 40;
     int box_h = 16;
     int spacing = (320 - (6 * box_w)) / 7;
@@ -88,6 +93,15 @@ void ui_init(void)
     lv_line_set_points(bottom_line, bottom_line_pts, 2);
     lv_obj_set_style_line_color(bottom_line, COLOR_WHITE, 0);
     lv_obj_set_style_line_width(bottom_line, 1, 0);
+
+    // Usamos un arreglo de punteros a tus variables globales para actualizarlas directamente
+    lv_obj_t **lbl_state_bar_refs[] = {
+        &label_controller_type,
+        &label_encoder_type,
+        &label_encoder_resolution,
+        &label_com_iface,
+        &label_remote_state,
+        &label_error_state};
 
     for (int i = 0; i < 6; i++)
     {
@@ -102,14 +116,12 @@ void ui_init(void)
         lv_obj_set_style_pad_all(stat_box, 0, 0);
         lv_obj_clear_flag(stat_box, LV_OBJ_FLAG_SCROLLABLE);
 
-        if (status_items[i][0] != '\0')
-        {
-            lv_obj_t *lbl = lv_label_create(stat_box);
-            lv_label_set_text(lbl, status_items[i]);
-            lv_obj_set_style_text_font(lbl, &verdana_pro_semi_bold_16_glyph, 0);
-            lv_obj_set_style_text_color(lbl, COLOR_WHITE, 0);
-            lv_obj_align(lbl, LV_ALIGN_CENTER, 0, 0);
-        }
+        // Creamos el label directamente dentro del stat_box y lo asignamos al puntero global
+        *(lbl_state_bar_refs[i]) = lv_label_create(stat_box);
+        lv_label_set_text(*(lbl_state_bar_refs[i]), status_items[i]);
+        lv_obj_set_style_text_font(*(lbl_state_bar_refs[i]), &verdana_pro_semi_bold_16_glyph, 0);
+        lv_obj_set_style_text_color(*(lbl_state_bar_refs[i]), COLOR_WHITE, 0);
+        lv_obj_align(*(lbl_state_bar_refs[i]), LV_ALIGN_CENTER, 0, 0);
     }
 
     /**************************************************************************
@@ -278,8 +290,12 @@ static char buf_kd[7];
 static char buf_sp[7];
 static char buf_lim_min[7];
 static char buf_lim_max[7];
-static char out_state_on[] = "OUT: ON";
-static char out_state_off[] = "OUT: OFF";
+static const char out_state_on[] = "OUT: ON";
+static const char out_state_off[] = "OUT: OFF";
+static const char bar_state_err[] = "ERR";
+static const char bar_state_rem[] = "REM";
+static const char str_empty[] = "";
+
 // static const char units_rad_seg[] = "1/s";
 // static const char units_rpm[] = "RPM";
 // static const char units_hz[] = "Hz";
@@ -331,10 +347,11 @@ void ui_update_value_kd(float kd)
     snprintf(buf_kd, sizeof(buf_kd), "%06.1f", kd);
     if (lvgl_port_lock(0))
     {
-        lv_label_set_text(label_min_d_value, buf_kd);
+        lv_label_set_text(label_set_kd_value, buf_kd); // CORREGIDO: label_set_kd_value
         lvgl_port_unlock();
     }
 }
+
 void ui_update_value_min(float min)
 {
     snprintf(buf_lim_min, sizeof(buf_lim_min), "%06.1f", min);
@@ -344,16 +361,18 @@ void ui_update_value_min(float min)
         lvgl_port_unlock();
     }
 }
+
 void ui_update_value_max(float max)
 {
-    snprintf(buf_kd, sizeof(buf_kd), "%06.1f", max);
+    snprintf(buf_lim_max, sizeof(buf_lim_max), "%06.1f", max); // CORREGIDO: buf_lim_max
 
     if (lvgl_port_lock(0))
     {
-        lv_label_set_text(label_set_kd_value, buf_lim_max);
+        lv_label_set_text(label_max_d_value, buf_lim_max); // CORREGIDO: label_max_d_value
         lvgl_port_unlock();
     }
 }
+
 void ui_update_out_state(bool state)
 {
     if (state)
@@ -361,7 +380,7 @@ void ui_update_out_state(bool state)
 
         if (lvgl_port_lock(0))
         {
-            lv_label_set_text(label_out_state, out_state_on);
+            lv_label_set_text_static(label_out_state, out_state_on);
             lv_obj_set_style_text_color(label_out_state, COLOR_RED_OUT_ON, 0);
             lvgl_port_unlock();
         }
@@ -371,8 +390,49 @@ void ui_update_out_state(bool state)
 
         if (lvgl_port_lock(0))
         {
-            lv_label_set_text(label_out_state, out_state_off);
+            lv_label_set_text_static(label_out_state, out_state_off);
             lv_obj_set_style_text_color(label_out_state, COLOR_GREEN_OUT_OFF, 0);
+            lvgl_port_unlock();
+        }
+    }
+}
+
+void ui_update_error_mark(bool state)
+{
+
+    if (state)
+    {
+        if (lvgl_port_lock(0))
+        {
+            lv_label_set_text_static(label_error_state, bar_state_err);
+            lvgl_port_unlock();
+        }
+    }
+    else
+    {
+        if (lvgl_port_lock(0))
+        {
+            lv_label_set_text_static(label_error_state, str_empty);
+            lvgl_port_unlock();
+        }
+    }
+}
+
+void ui_update_remote_mark(bool state)
+{
+    if (state)
+    {
+        if (lvgl_port_lock(0))
+        {
+            lv_label_set_text_static(label_remote_state, bar_state_rem);
+            lvgl_port_unlock();
+        }
+    }
+    else
+    {
+        if (lvgl_port_lock(0))
+        {
+            lv_label_set_text_static(label_remote_state, str_empty);
             lvgl_port_unlock();
         }
     }

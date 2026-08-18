@@ -7,7 +7,7 @@ extern "C"
 #endif
 
     void hmi_display_init(void);
-    void display_task(void *pvParameter);
+    void display_init(void);
     void ui_task(void *pvParameter);
 
 #ifdef __cplusplus

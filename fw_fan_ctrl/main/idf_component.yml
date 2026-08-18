@@ -16,3 +16,4 @@ dependencies:
   #   public: true
   espressif/esp_lcd_ili9341: '*'
   espressif/esp_lvgl_port: '*'
+  espressif/esp_tinyusb: '*'
