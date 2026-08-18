@@ -1,5 +1,5 @@
 {
-  "idf.currentSetup": "E:\\esp\\v6.0.2\\esp-idf",
+  "idf.currentSetup": "C:\\esp\\v6.0.2\\esp-idf",
   "idf.portWin": "COM7",
   "idf.openOcdConfigs": [
     "interface/ftdi/esp_ftdi.cfg",
@@ -10,6 +10,7 @@
   "clangd.arguments": [
     "--background-index",
     "--query-driver=**",
-    "--compile-commands-dir=e:\\Users\\damian\\Proyectos\\Control_Ventilador\\fan_ctrl\\fw_fan_ctrl\\build"
-  ]
+    "--compile-commands-dir=c:\\Users\\damian\\Documents\\Proyectos\\fan_ctrl\\fw_fan_ctrl\\build"
+  ],
+  "idf.customExtraVars": {}
 }

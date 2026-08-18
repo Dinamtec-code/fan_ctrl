@@ -5,7 +5,7 @@ idf_component_register(
     "src/usb_tmc_init.c" 
     "src/usb_tmc_process.c"
     INCLUDE_DIRS "include" 
-    REQUIRES tinyusb esp_tinyusb esp_system libscpi
+    REQUIRES tinyusb esp_tinyusb esp_system libscpi controller
     WHOLE_ARCHIVE)
 
 if(TARGET __idf_espressif__tinyusb)

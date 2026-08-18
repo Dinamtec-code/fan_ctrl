@@ -103,7 +103,7 @@ void tud_resume_cb(void)
   ESP_LOGI(TAG_USB, "USB resumen");
 }
 
-bool tud_get_connectoin(void)
+bool tud_get_connection(void)
 {
   return usb_host_connected;
 }
