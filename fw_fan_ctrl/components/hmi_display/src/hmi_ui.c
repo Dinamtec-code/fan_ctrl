@@ -248,8 +248,8 @@ void ui_init(void)
     const char *out_cfg_info_value[] = {"000.0%", "100.0%"};
     label_max_d_value = lv_label_create(scr);
     label_min_d_value = lv_label_create(scr);
-    lv_obj_t *lbl_out_cfg_value[] = {label_max_d_value,
-                                     label_min_d_value};
+    lv_obj_t *lbl_out_cfg_value[] = {label_min_d_value,
+                                     label_max_d_value};
 
     for (int i = 0; i < 2; i++)
     {
@@ -354,7 +354,7 @@ void ui_update_value_kd(float kd)
 
 void ui_update_value_min(float min)
 {
-    snprintf(buf_lim_min, sizeof(buf_lim_min), "%06.1f", min);
+    snprintf(buf_lim_min, sizeof(buf_lim_min), "%05.1f%%", min);
     if (lvgl_port_lock(0))
     {
         lv_label_set_text(label_min_d_value, buf_lim_min);
@@ -364,11 +364,11 @@ void ui_update_value_min(float min)
 
 void ui_update_value_max(float max)
 {
-    snprintf(buf_lim_max, sizeof(buf_lim_max), "%06.1f", max); // CORREGIDO: buf_lim_max
+    snprintf(buf_lim_max, sizeof(buf_lim_max), "%05.1f%%", max);
 
     if (lvgl_port_lock(0))
     {
-        lv_label_set_text(label_max_d_value, buf_lim_max); // CORREGIDO: label_max_d_value
+        lv_label_set_text(label_max_d_value, buf_lim_max);
         lvgl_port_unlock();
     }
 }
@@ -392,6 +392,26 @@ void ui_update_out_state(bool state)
         {
             lv_label_set_text_static(label_out_state, out_state_off);
             lv_obj_set_style_text_color(label_out_state, COLOR_GREEN_OUT_OFF, 0);
+            lvgl_port_unlock();
+        }
+    }
+}
+
+void ui_update_ctrl_type(ctrl_type_t type)
+{
+    if (type == CTRL_OPEN)
+    {
+        if (lvgl_port_lock(0))
+        {
+            lv_label_set_text_static(label_controller_type, "OPEN");
+            lvgl_port_unlock();
+        }
+    }
+    else if (type == CTRL_PID)
+    {
+        if (lvgl_port_lock(0))
+        {
+            lv_label_set_text_static(label_controller_type, "PID");
             lvgl_port_unlock();
         }
     }

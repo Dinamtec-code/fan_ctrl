@@ -9,5 +9,5 @@ idf_component_register(
     "src/verdana_pro_semi_bold_40_glyph.c"
 
     INCLUDE_DIRS "include"
-    REQUIRES freertos driver esp_lcd esp_lvgl_port lvgl espressif__esp_lcd_ili9341 usb_tmc
+    REQUIRES freertos driver esp_lcd esp_lvgl_port lvgl espressif__esp_lcd_ili9341 usb_tmc controller
 )

@@ -4,6 +4,7 @@
 #include "hmi_display.h"
 #include "usb_tmc_init.h"
 #include "usb_tmc_process.h"
+#include "ctrl_task.h"
 
 // 1. Definir el tamaño en BYTES
 #define DISPLAY_TASK_STACK_SIZE 8 * 1024
@@ -20,6 +21,8 @@ void sys_init_task(void *pvParameter)
 
 void app_main(void)
 {
+
+
     scpi_engine_init();
     tmc_hal_init();
 
@@ -33,4 +36,5 @@ void app_main(void)
         NULL,
         1 // Anclado al Core 1 (PRO_CPU es 0, APP_CPU es 1)
     );
+    ctrl_init();
 }

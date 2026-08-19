@@ -1,6 +1,8 @@
 #ifndef HMI_UI_H_
 #define HMI_UI_H_
 
+#include "ctrl_data.h"
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -18,8 +20,10 @@ extern "C"
     void ui_update_value_min(float min);
     void ui_update_value_max(float max);
     void ui_update_out_state(bool state);
+    void ui_update_ctrl_type(ctrl_type_t type);
     void ui_update_error_mark(bool state);
     void ui_update_remote_mark(bool state);
+    void ui_publish_update(void);
 
 #ifdef __cplusplus
 }

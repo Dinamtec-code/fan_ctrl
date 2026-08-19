@@ -28,7 +28,7 @@ extern "C"
     bool tud_usbtmc_check_abort_bulk_in_cb(usbtmc_check_abort_bulk_rsp_t *rsp);
     bool tud_usbtmc_initiate_clear_cb(uint8_t *tmcResult);
     bool tud_usbtmc_check_clear_cb(usbtmc_get_clear_status_rsp_t *rsp);
-    bool tud_get_connectoin(void);
+    bool tud_get_connection(void);
 
 #ifdef __cplusplus
 }

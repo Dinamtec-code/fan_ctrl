@@ -20,6 +20,8 @@
 #include "usb_tmc_process.h"
 #include "usb_tmc_init.h"
 
+#include "ctrl_data.h"
+
 const static char *TAG = "tmc_fsm_task";
 
 /**********************************************************************************************************
@@ -29,8 +31,6 @@ const static char *TAG = "tmc_fsm_task";
 #define RX_BUFFER_SIZE 1024
 #define TX_BUFFER_SIZE 1024 * 16
 
-// static uint8_t rx_buffer_odd[RX_BUFFER_SIZE] = {0};
-// static uint8_t rx_buffer_even[RX_BUFFER_SIZE] = {0};
 static uint8_t tx_buffer[TX_BUFFER_SIZE] = {0};
 static size_t data_2_tx = 0;
 
@@ -46,24 +46,13 @@ bool tmc_scpi_has_errors(void)
 
 bool tmc_scpi_has_connected(void)
 {
-    return tud_get_connectoin();
+    return tud_get_connection();
 }
 
 /**********************************************************************************************************
  * SCPI
  *
  *********************************************************************************************************/
-
-float kp[4] = {1.0f, 2.0f, 3.0f, 4.0f};
-float ki[4] = {5.0f, 6.0f, 7.0f, 8.0f};
-float kd[4] = {9.0f, 10.0f, 11.0f, 12.0f};
-
-float temp[2] = {25.0f, 26.0f};
-float set_point[2] = {35.0f, 36.0f};
-
-float duty[2] = {0.5f, 0.5f};
-
-bool output_status[2] = {0, 0};
 
 /* ==========================================================================
  * Contexto global de libscpi y buffers asociados
@@ -76,84 +65,25 @@ static char scpi_input_buffer[SCPI_INPUT_BUFFER_LENGTH];
 static scpi_error_t scpi_error_queue[SCPI_ERROR_QUEUE_SIZE];
 
 static scpi_result_t my_CoreRst(scpi_t *context);
-
-/* ==========================================================================
- * Funciones auxiliares de los comandos del instrumento
- * ========================================================================== */
-
-static float get_temperature(void)
-{
-    return temp[0];
-}
-
-static float get_setpoint(uint8_t channel)
-{
-    return set_point[channel - 1];
-}
-
-static void set_setpoint(uint8_t channel, float val)
-{
-    set_point[channel - 1] = val;
-}
-
-static float get_kp(void)
-{
-    return kp[0];
-}
-
-static void set_kp(float val)
-{
-    kp[0] = val;
-}
-
-static float get_ki(void)
-{
-    return ki[0];
-}
-
-static void set_ki(float val)
-{
-    ki[0] = val;
-}
-
-static float get_kd(void)
-{
-    return kd[0];
-}
-
-static void set_kd(float val)
-{
-    kd[0] = val;
-}
-
-static float get_duty(void)
-{
-    return duty[0];
-}
-
-static bool get_output(uint8_t channel)
-{
-    return output_status[channel - 1];
-}
-
-static void set_output(uint8_t channel, bool on)
-{
-    output_status[channel - 1] = on;
-}
-
 /* ==========================================================================
  * Callbacks de comandos SCPI
  * ========================================================================== */
 
 static scpi_result_t
-cmd_meas_temp(scpi_t *context)
+cmd_meas_speed(scpi_t *context)
 {
-
-    SCPI_ResultFloat(context, get_temperature());
+    int32_t channel;
+    SCPI_CommandNumbers(context, &channel, 1, 1);
+    if (channel < 1 || channel > 2)
+    {
+        SCPI_ErrorPush(context, SCPI_ERROR_INVALID_SUFFIX);
+        return SCPI_RES_ERR;
+    }
+    SCPI_ResultFloat(context, 12345);
     return SCPI_RES_OK;
 }
 
-static scpi_result_t cmd_temp_sp_q(scpi_t *context)
+static scpi_result_t cmd_ctrl_sp_q(scpi_t *context)
 {
     int32_t numbers[1]; // Arreglo para capturar los sufijos del comando
 
@@ -169,11 +99,11 @@ static scpi_result_t cmd_temp_sp_q(scpi_t *context)
         return SCPI_RES_ERR;
     }
 
-    SCPI_ResultFloat(context, get_setpoint(channel));
+    SCPI_ResultFloat(context, ctrl_get_setpoint_value((uint8_t)channel - 1));
     return SCPI_RES_OK;
 }
 
-scpi_result_t cmd_temp_sp(scpi_t *context)
+scpi_result_t cmd_ctrl_sp(scpi_t *context)
 {
     int32_t numbers[1]; // Arreglo para capturar los sufijos del comando
     float setpoint;
@@ -196,23 +126,52 @@ scpi_result_t cmd_temp_sp(scpi_t *context)
         return SCPI_RES_ERR;
     }
 
-    set_setpoint(channel, setpoint);
+    ctrl_set_setpoint_value((uint8_t)channel - 1, setpoint);
 
     return SCPI_RES_OK;
 }
 
 static scpi_result_t cmd_pid_kp_q(scpi_t *context)
 {
-    SCPI_ResultFloat(context, get_kp());
+    int32_t channel;
+
+    // 1. Obtener el número de canal del nodo raíz (ej. SOURce1 -> 1)
+    // El último parámetro es el valor por defecto si el usuario envía "SOUR:TEMP..." sin número.
+    SCPI_CommandNumbers(context, &channel, 1, 1);
+
+    // 2. Validar que el canal exista en tu hardware
+    if (channel < 1 || channel > 2)
+    {
+        SCPI_ErrorPush(context, SCPI_ERROR_INVALID_SUFFIX);
+        return SCPI_RES_ERR;
+    }
+    SCPI_ResultFloat(context, ctrl_get_kp_value((uint8_t)channel - 1));
     return SCPI_RES_OK;
 }
 
 static scpi_result_t cmd_pid_kp(scpi_t *context)
 {
-    float val;
-    if (SCPI_ParamFloat(context, &val, true))
+    int32_t channel;
+    float kp;
+    // 1. Obtener el canal
+    SCPI_CommandNumbers(context, &channel, 1, 1);
+
+    // 2. Validar que el canal exista en tu hardware
+    if (channel < 1 || channel > 2)
     {
-        set_kp(val);
+        SCPI_ErrorPush(context, SCPI_ERROR_INVALID_SUFFIX);
+        return SCPI_RES_ERR;
+    }
+
+    // 3. Extraer el parámetro enviado por el usuario
+    if (!SCPI_ParamFloat(context, &kp, TRUE))
+    {
+        return SCPI_RES_ERR;
+    }
+
+    if (SCPI_ParamFloat(context, &kp, true))
+    {
+        ctrl_set_kp_value((uint8_t)channel - 1, kp);
         return SCPI_RES_OK;
     }
     return SCPI_RES_ERR;
@@ -220,16 +179,45 @@ static scpi_result_t cmd_pid_kp(scpi_t *context)
 
 static scpi_result_t cmd_pid_ki_q(scpi_t *context)
 {
-    SCPI_ResultFloat(context, get_ki());
+    int32_t channel;
+
+    // 1. Obtener el número de canal del nodo raíz (ej. SOURce1 -> 1)
+    // El último parámetro es el valor por defecto si el usuario envía "SOUR:TEMP..." sin número.
+    SCPI_CommandNumbers(context, &channel, 1, 1);
+
+    // 2. Validar que el canal exista en tu hardware
+    if (channel < 1 || channel > 2)
+    {
+        SCPI_ErrorPush(context, SCPI_ERROR_INVALID_SUFFIX);
+        return SCPI_RES_ERR;
+    }
+    SCPI_ResultFloat(context, ctrl_get_ki_value((uint8_t)channel - 1));
     return SCPI_RES_OK;
 }
 
 static scpi_result_t cmd_pid_ki(scpi_t *context)
 {
-    float val;
-    if (SCPI_ParamFloat(context, &val, true))
+    int32_t channel;
+    float ki;
+    // 1. Obtener el canal
+    SCPI_CommandNumbers(context, &channel, 1, 1);
+
+    // 2. Validar que el canal exista en tu hardware
+    if (channel < 1 || channel > 2)
     {
-        set_ki(val);
+        SCPI_ErrorPush(context, SCPI_ERROR_INVALID_SUFFIX);
+        return SCPI_RES_ERR;
+    }
+
+    // 3. Extraer el parámetro enviado por el usuario
+    if (!SCPI_ParamFloat(context, &ki, TRUE))
+    {
+        return SCPI_RES_ERR;
+    }
+
+    if (SCPI_ParamFloat(context, &ki, true))
+    {
+        ctrl_set_ki_value((uint8_t)channel - 1, ki);
         return SCPI_RES_OK;
     }
     return SCPI_RES_ERR;
@@ -237,16 +225,43 @@ static scpi_result_t cmd_pid_ki(scpi_t *context)
 
 static scpi_result_t cmd_pid_kd_q(scpi_t *context)
 {
-    SCPI_ResultFloat(context, get_kd());
+    int32_t channel;
+
+    // 1. Obtener el número de canal del nodo raíz (ej. SOURce1 -> 1)
+    // El último parámetro es el valor por defecto si el usuario envía "SOUR:TEMP..." sin número.
+    SCPI_CommandNumbers(context, &channel, 1, 1);
+
+    // 2. Validar que el canal exista en tu hardware
+    if (channel < 1 || channel > 2)
+    {
+        SCPI_ErrorPush(context, SCPI_ERROR_INVALID_SUFFIX);
+        return SCPI_RES_ERR;
+    }
+    SCPI_ResultFloat(context, ctrl_get_kd_value((uint8_t)channel - 1));
     return SCPI_RES_OK;
 }
 
 static scpi_result_t cmd_pid_kd(scpi_t *context)
 {
-    float val;
-    if (SCPI_ParamFloat(context, &val, true))
+    int32_t channel;
+    float kd;
+
+    SCPI_CommandNumbers(context, &channel, 1, 1);
+
+    if (channel < 1 || channel > 2)
     {
-        set_kd(val);
+        SCPI_ErrorPush(context, SCPI_ERROR_INVALID_SUFFIX);
+        return SCPI_RES_ERR;
+    }
+
+    if (!SCPI_ParamFloat(context, &kd, TRUE))
+    {
+        return SCPI_RES_ERR;
+    }
+
+    if (SCPI_ParamFloat(context, &kd, true))
+    {
+        ctrl_set_kd_value((uint8_t)channel - 1, kd);
         return SCPI_RES_OK;
     }
     return SCPI_RES_ERR;
@@ -254,32 +269,108 @@ static scpi_result_t cmd_pid_kd(scpi_t *context)
 
 static scpi_result_t cmd_pid_duty_q(scpi_t *context)
 {
-    SCPI_ResultFloat(context, get_duty());
+    int32_t channel;
+
+    SCPI_CommandNumbers(context, &channel, 1, 1);
+
+    if (channel < 1 || channel > 2)
+    {
+        SCPI_ErrorPush(context, SCPI_ERROR_INVALID_SUFFIX);
+        return SCPI_RES_ERR;
+    }
+    SCPI_ResultFloat(context, ctrl_get_duty_value((uint8_t)channel - 1));
     return SCPI_RES_OK;
 }
 
-static scpi_result_t cmd_sour_outp(scpi_t *context)
+static scpi_result_t cmd_pid_type_q(scpi_t *context)
 {
-    uint64_t channel;
-    scpi_bool_t on;
-    if (!SCPI_ParamUInt64(context, &channel, true))
+    int32_t channel;
+
+    // 1. Obtener el número de canal del nodo raíz (ej. SOURce1 -> 1)
+    // El último parámetro es el valor por defecto si el usuario envía "SOUR:TEMP..." sin número.
+    SCPI_CommandNumbers(context, &channel, 1, 1);
+
+    // 2. Validar que el canal exista en tu hardware
+    if (channel < 1 || channel > 2)
+    {
+        SCPI_ErrorPush(context, SCPI_ERROR_INVALID_SUFFIX);
         return SCPI_RES_ERR;
-    if (channel > 1)
+    }
+    if (ctrl_get_controller_type((uint8_t)channel - 1) == CTRL_OPEN)
+    {
+        SCPI_ResultCharacters(context, "OPEN", 5);
+    }
+    if (ctrl_get_controller_type((uint8_t)channel - 1) == CTRL_PID)
+    {
+        SCPI_ResultCharacters(context, "PID", 4);
+    }
+
+    return SCPI_RES_OK;
+}
+
+static scpi_result_t cmd_pid_type(scpi_t *context)
+{
+
+    const char *param_ptr;
+    size_t param_len;
+    int32_t numbers[1]; // Para capturar el índice de SOURce#
+
+    // 1. Obtener el número de canal del comando (ej: SOURce1 -> 1)
+    SCPI_CommandNumbers(context, numbers, 1, 1);
+    int channel = numbers[0];
+
+    // 2. Extraer el parámetro de texto plano
+    if (!SCPI_ParamCharacters(context, &param_ptr, &param_len, TRUE))
+    {
         return SCPI_RES_ERR;
-    if (!SCPI_ParamBool(context, &on, true))
-        return SCPI_RES_ERR;
-    set_output((uint8_t)channel, on);
+    }
+
+    if (strncmp(param_ptr, "OPEN", param_len) == 0 && param_len == 4)
+    {
+        ctrl_set_controller_type((uint8_t)channel - 1, CTRL_OPEN);
+    }
+    else if (strncmp(param_ptr, "PID", param_len) == 0 && param_len == 3)
+    {
+        ctrl_set_controller_type((uint8_t)channel - 1, CTRL_PID);
+    }
+
     return SCPI_RES_OK;
 }
 
 static scpi_result_t cmd_sour_outp_q(scpi_t *context)
 {
-    uint64_t channel;
-    if (!SCPI_ParamUInt64(context, &channel, true))
+    int32_t channel;
+
+    SCPI_CommandNumbers(context, &channel, 1, 1);
+
+    if (channel < 1 || channel > 2)
+    {
+        SCPI_ErrorPush(context, SCPI_ERROR_INVALID_SUFFIX);
         return SCPI_RES_ERR;
-    if (channel > 1)
+    }
+
+    SCPI_ResultBool(context, ctrl_get_output_state((uint8_t)channel));
+    return SCPI_RES_OK;
+}
+
+static scpi_result_t cmd_sour_outp(scpi_t *context)
+{
+    int32_t channel;
+    scpi_bool_t on;
+
+    SCPI_CommandNumbers(context, &channel, 1, 1);
+
+    if (channel < 1 || channel > 2)
+    {
+        SCPI_ErrorPush(context, SCPI_ERROR_INVALID_SUFFIX);
         return SCPI_RES_ERR;
-    SCPI_ResultBool(context, get_output((uint8_t)channel));
+    }
+
+    if (!SCPI_ParamBool(context, &on, true))
+    {
+        return SCPI_RES_ERR;
+    }
+    ctrl_set_output_state((uint8_t)channel, (bool)on);
     return SCPI_RES_OK;
 }
 
@@ -396,11 +487,11 @@ static const scpi_command_t scpi_commands[] = {
         .callback = SCPI_StatusPreset,
     },
     /* Medición */
-    {.pattern = "MEASure:TEMPerature#?", .callback = cmd_meas_temp, .tag = 0},
+    {.pattern = "MEASure:SPEED#?", .callback = cmd_meas_speed, .tag = 0},
 
     /* Setpoint */
-    {.pattern = "SOURce#:TEMPerature:SETPOint?", .callback = cmd_temp_sp_q, .tag = 0},
-    {.pattern = "SOURce#:TEMPerature:SETPOint", .callback = cmd_temp_sp, .tag = 0},
+    {.pattern = "SOURce#:CONTrol:SETPOint?", .callback = cmd_ctrl_sp_q, .tag = 0},
+    {.pattern = "SOURce#:CONTrol:SETPOint", .callback = cmd_ctrl_sp, .tag = 0},
 
     /* PID */
     {.pattern = "SOURce#:CONTrol:PID:KP?", .callback = cmd_pid_kp_q, .tag = 0},
@@ -409,7 +500,9 @@ static const scpi_command_t scpi_commands[] = {
     {.pattern = "SOURce#:CONTrol:PID:KI", .callback = cmd_pid_ki, .tag = 0},
     {.pattern = "SOURce#:CONTrol:PID:KD?", .callback = cmd_pid_kd_q, .tag = 0},
     {.pattern = "SOURce#:CONTrol:PID:KD", .callback = cmd_pid_kd, .tag = 0},
-    {.pattern = "SOURce#:CONTrol:PID:OUTPut?", .callback = cmd_pid_duty_q, .tag = 0},
+    {.pattern = "SOURce#:CONTrol:PID:DUty?", .callback = cmd_pid_duty_q, .tag = 0},
+    {.pattern = "SOURce#:CONTrol:PID:TYPE?", .callback = cmd_pid_type_q, .tag = 0},
+    {.pattern = "SOURce#:CONTrol:PID:TYPE", .callback = cmd_pid_type, .tag = 0},
 
     /* Salidas */
     {.pattern = "SOURce#:OUTPut", .callback = cmd_sour_outp, .tag = 0},
@@ -428,28 +521,18 @@ usb_tmc_status_t usb_tmc_get_stb(void)
 static scpi_result_t my_CoreRst(scpi_t *context)
 {
     (void)context;
-    SCPI_CoreRst(context); // Reset del parser y registros IEEE 488.2
-    set_point[0] = 0.0f;
-    set_point[1] = 0.0f;
+    SCPI_CoreRst(context);
 
-    kp[0] = 1.0f;
-    kp[1] = 2.0f;
-    ki[0] = 5.0f;
-    ki[1] = 6.0f;
-    kd[0] = 9.0f;
-    kd[1] = 10.0f;
-
-    temp[0] = 25.0f;
-    temp[1] = 26.0f;
-    set_point[0] = 35.0f;
-    set_point[1] = 36.0f;
-
-    duty[0] = 0.5f;
-    duty[1] = 0.5f;
-
-    output_status[0] = 0;
-    output_status[1] = 0;
-    // config_apply_reset_values(); // Restauración de los parámetros del instrumento
+    for (uint8_t i = 0; i < CTRL_NUM_CHANNELS; i++)
+    {
+        ctrl_set_setpoint_value(i, 0.0f);
+        ctrl_set_kp_value(i, 1.0f); // O el valor default que quieras
+        ctrl_set_ki_value(i, 0.0f);
+        ctrl_set_kd_value(i, 0.0f);
+        ctrl_set_duty_value(i, 0.0f);
+        ctrl_set_output_state(i, false);
+        ctrl_set_controller_type(i, CTRL_OPEN);
+    }
     return SCPI_RES_OK;
 }
 

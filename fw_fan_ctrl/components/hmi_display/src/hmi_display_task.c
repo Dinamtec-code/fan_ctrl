@@ -13,6 +13,7 @@
 #include "hmi_ui.h"
 #include "esp_heap_caps.h"
 #include "usb_tmc_process.h"
+#include "ctrl_data.h"
 
 // --- Definición de Pines (Ajusta según tu placa) ---
 #define LCD_HOST SPI2_HOST
@@ -134,40 +135,35 @@ void display_init(void)
 }
 
 static float speed = 0;
-static float dut = 0;
 
 void ui_task(void *pvParameter)
 {
-    static bool out = false;
     vTaskDelay(pdMS_TO_TICKS(2000));
     while (1)
     {
         // 1. Haces tu lógica y cálculos normalmente
-        speed += 10;
-        dut += 2.4;
+        speed += 1;
 
-        if (dut > 100)
-        {
-            dut = 0.0;
-            if (out == true)
-            {
-                out = false;
-            }
-            else
-            {
-                out = true;
-            }
-            ui_update_out_state(out);
-        }
         if (speed > 8000)
         {
             speed = 0.0;
         }
+        ui_update_values(speed, ctrl_get_duty_value(0));
 
-        ui_update_values(speed, dut);
+        if (ctrl_data_get_update())
+        {
+
+            ui_update_value_point(ctrl_get_setpoint_value(0));
+            ui_update_value_kp(ctrl_get_kp_value(0));
+            ui_update_value_ki(ctrl_get_ki_value(0));
+            ui_update_value_kd(ctrl_get_kd_value(0));
+            ui_update_value_min(ctrl_get_duty_min(0));
+            ui_update_value_max(ctrl_get_duty_max(0));
+        }
+        ui_update_out_state(ctrl_get_output_state(0));
+        ui_update_ctrl_type(ctrl_get_controller_type(0));
         ui_update_error_mark(tmc_scpi_has_errors());
         ui_update_remote_mark(tmc_scpi_has_connected());
-
         vTaskDelay(pdMS_TO_TICKS(50));
     }
 }
