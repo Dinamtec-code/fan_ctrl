@@ -1,5 +1,5 @@
 {
-  "idf.currentSetup": "E:\\esp\\v6.0.2\\esp-idf",
+  "idf.currentSetup": "C:\\esp\\v6.0.2\\esp-idf",
   "idf.portWin": "COM7",
   "idf.openOcdConfigs": [
     "interface/ftdi/esp_ftdi.cfg",

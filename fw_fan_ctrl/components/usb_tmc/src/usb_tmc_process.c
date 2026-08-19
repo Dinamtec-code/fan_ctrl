@@ -22,6 +22,8 @@
 
 #include "ctrl_data.h"
 
+#include "ctrl_data.h"
+
 const static char *TAG = "tmc_fsm_task";
 
 /**********************************************************************************************************
@@ -47,6 +49,7 @@ bool tmc_scpi_has_errors(void)
 bool tmc_scpi_has_connected(void)
 {
     return tud_get_connection();
+    return tud_get_connection();
 }
 
 /**********************************************************************************************************
@@ -71,7 +74,16 @@ static scpi_result_t my_CoreRst(scpi_t *context);
 
 static scpi_result_t
 cmd_meas_speed(scpi_t *context)
+cmd_meas_speed(scpi_t *context)
 {
+    int32_t channel;
+    SCPI_CommandNumbers(context, &channel, 1, 1);
+    if (channel < 1 || channel > 2)
+    {
+        SCPI_ErrorPush(context, SCPI_ERROR_INVALID_SUFFIX);
+        return SCPI_RES_ERR;
+    }
+    SCPI_ResultFloat(context, 12345);
     int32_t channel;
     SCPI_CommandNumbers(context, &channel, 1, 1);
     if (channel < 1 || channel > 2)
@@ -83,6 +95,7 @@ cmd_meas_speed(scpi_t *context)
     return SCPI_RES_OK;
 }
 
+static scpi_result_t cmd_ctrl_sp_q(scpi_t *context)
 static scpi_result_t cmd_ctrl_sp_q(scpi_t *context)
 {
     int32_t numbers[1]; // Arreglo para capturar los sufijos del comando
@@ -103,6 +116,7 @@ static scpi_result_t cmd_ctrl_sp_q(scpi_t *context)
     return SCPI_RES_OK;
 }
 
+scpi_result_t cmd_ctrl_sp(scpi_t *context)
 scpi_result_t cmd_ctrl_sp(scpi_t *context)
 {
     int32_t numbers[1]; // Arreglo para capturar los sufijos del comando
@@ -170,6 +184,25 @@ static scpi_result_t cmd_pid_kp(scpi_t *context)
     }
 
     if (SCPI_ParamFloat(context, &kp, true))
+    int32_t channel;
+    float kp;
+    // 1. Obtener el canal
+    SCPI_CommandNumbers(context, &channel, 1, 1);
+
+    // 2. Validar que el canal exista en tu hardware
+    if (channel < 1 || channel > 2)
+    {
+        SCPI_ErrorPush(context, SCPI_ERROR_INVALID_SUFFIX);
+        return SCPI_RES_ERR;
+    }
+
+    // 3. Extraer el parámetro enviado por el usuario
+    if (!SCPI_ParamFloat(context, &kp, TRUE))
+    {
+        return SCPI_RES_ERR;
+    }
+
+    if (SCPI_ParamFloat(context, &kp, true))
     {
         ctrl_set_kp_value((uint8_t)channel - 1, kp);
         return SCPI_RES_OK;
@@ -216,6 +249,25 @@ static scpi_result_t cmd_pid_ki(scpi_t *context)
     }
 
     if (SCPI_ParamFloat(context, &ki, true))
+    int32_t channel;
+    float ki;
+    // 1. Obtener el canal
+    SCPI_CommandNumbers(context, &channel, 1, 1);
+
+    // 2. Validar que el canal exista en tu hardware
+    if (channel < 1 || channel > 2)
+    {
+        SCPI_ErrorPush(context, SCPI_ERROR_INVALID_SUFFIX);
+        return SCPI_RES_ERR;
+    }
+
+    // 3. Extraer el parámetro enviado por el usuario
+    if (!SCPI_ParamFloat(context, &ki, TRUE))
+    {
+        return SCPI_RES_ERR;
+    }
+
+    if (SCPI_ParamFloat(context, &ki, true))
     {
         ctrl_set_ki_value((uint8_t)channel - 1, ki);
         return SCPI_RES_OK;
@@ -243,6 +295,23 @@ static scpi_result_t cmd_pid_kd_q(scpi_t *context)
 
 static scpi_result_t cmd_pid_kd(scpi_t *context)
 {
+    int32_t channel;
+    float kd;
+
+    SCPI_CommandNumbers(context, &channel, 1, 1);
+
+    if (channel < 1 || channel > 2)
+    {
+        SCPI_ErrorPush(context, SCPI_ERROR_INVALID_SUFFIX);
+        return SCPI_RES_ERR;
+    }
+
+    if (!SCPI_ParamFloat(context, &kd, TRUE))
+    {
+        return SCPI_RES_ERR;
+    }
+
+    if (SCPI_ParamFloat(context, &kd, true))
     int32_t channel;
     float kd;
 
@@ -368,11 +437,19 @@ static scpi_result_t cmd_sour_outp(scpi_t *context)
 
     if (!SCPI_ParamBool(context, &on, true))
     {
+    }
+
+    if (!SCPI_ParamBool(context, &on, true))
+    {
         return SCPI_RES_ERR;
     }
     ctrl_set_output_state((uint8_t)channel, (bool)on);
+    }
+    ctrl_set_output_state((uint8_t)channel, (bool)on);
     return SCPI_RES_OK;
+
 }
+
 
 /**
  * Reimplement IEEE488.2 *TST?
@@ -488,8 +565,11 @@ static const scpi_command_t scpi_commands[] = {
     },
     /* Medición */
     {.pattern = "MEASure:SPEED#?", .callback = cmd_meas_speed, .tag = 0},
+    {.pattern = "MEASure:SPEED#?", .callback = cmd_meas_speed, .tag = 0},
 
     /* Setpoint */
+    {.pattern = "SOURce#:CONTrol:SETPOint?", .callback = cmd_ctrl_sp_q, .tag = 0},
+    {.pattern = "SOURce#:CONTrol:SETPOint", .callback = cmd_ctrl_sp, .tag = 0},
     {.pattern = "SOURce#:CONTrol:SETPOint?", .callback = cmd_ctrl_sp_q, .tag = 0},
     {.pattern = "SOURce#:CONTrol:SETPOint", .callback = cmd_ctrl_sp, .tag = 0},
 
@@ -500,6 +580,9 @@ static const scpi_command_t scpi_commands[] = {
     {.pattern = "SOURce#:CONTrol:PID:KI", .callback = cmd_pid_ki, .tag = 0},
     {.pattern = "SOURce#:CONTrol:PID:KD?", .callback = cmd_pid_kd_q, .tag = 0},
     {.pattern = "SOURce#:CONTrol:PID:KD", .callback = cmd_pid_kd, .tag = 0},
+    {.pattern = "SOURce#:CONTrol:PID:DUty?", .callback = cmd_pid_duty_q, .tag = 0},
+    {.pattern = "SOURce#:CONTrol:PID:TYPE?", .callback = cmd_pid_type_q, .tag = 0},
+    {.pattern = "SOURce#:CONTrol:PID:TYPE", .callback = cmd_pid_type, .tag = 0},
     {.pattern = "SOURce#:CONTrol:PID:DUty?", .callback = cmd_pid_duty_q, .tag = 0},
     {.pattern = "SOURce#:CONTrol:PID:TYPE?", .callback = cmd_pid_type_q, .tag = 0},
     {.pattern = "SOURce#:CONTrol:PID:TYPE", .callback = cmd_pid_type, .tag = 0},
