@@ -66,16 +66,16 @@ static uint32_t frac_acc[2] = {0, 0};
 // Ajusta PWM_CHANNEL1 y PWM_CHANNEL2 según tu definición (ej. LEDC_CHANNEL_0, LEDC_CHANNEL_1)
 static const int hw_channels[] = {PWM_CHANNEL1, PWM_CHANNEL2};
 
-void update_duty(float duty, uint8_t channel)
+void ctrl_pwm_update_duty(float duty, uint8_t channel)
 {
     // Validaciones de seguridad
     if (channel >= 2)
         return; // Proteger contra índices fuera de rango del array
 
-    ctrl_set_duty_value(channel, duty);
+    // ctrl_set_duty_value(channel, duty);
 
     // Conversión a resolución de 15 bits. EL duty lo tomamos del registo de datos que ya registró y acotó el valor.
-    uint32_t target_15bit = (uint32_t)(ctrl_get_duty_value(channel) * (float)MAX_DUTY_15);
+    uint32_t target_15bit = (uint32_t)(ctrl_get_duty_value(channel) * (float)MAX_DUTY_15) / 100;
 
     // Separar parte entera (Hardware) y fraccionaria (Error)
     // La parte alta son los 11 bits reales

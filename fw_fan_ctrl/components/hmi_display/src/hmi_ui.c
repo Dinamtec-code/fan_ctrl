@@ -300,13 +300,21 @@ static const char str_empty[] = "";
 // static const char units_rpm[] = "RPM";
 // static const char units_hz[] = "Hz";
 
-void ui_update_values(float speed, float duty)
+void ui_update_value_speed(float speed)
 {
     snprintf(buf_speed, sizeof(buf_speed), "%06.1f", speed);
-    snprintf(buf_duty, sizeof(buf_duty), "%06.2f", duty);
     if (lvgl_port_lock(0))
     {
         lv_label_set_text(label_speed_value, buf_speed);
+        lvgl_port_unlock();
+    }
+}
+
+void ui_update_value_duty(float duty)
+{
+    snprintf(buf_duty, sizeof(buf_duty), "%06.2f", duty);
+    if (lvgl_port_lock(0))
+    {
         lv_label_set_text(label_duty_value, buf_duty);
         lvgl_port_unlock();
     }

@@ -142,17 +142,17 @@ void ui_task(void *pvParameter)
     while (1)
     {
         // 1. Haces tu lógica y cálculos normalmente
-        speed += 1;
+        speed += 1.1;
 
         if (speed > 8000)
         {
             speed = 0.0;
         }
-        ui_update_values(speed, ctrl_get_duty_value(0));
+        ui_update_value_speed(speed);
+        ui_update_value_duty(ctrl_get_duty_value(0));
 
         if (ctrl_data_get_update())
         {
-
             ui_update_value_point(ctrl_get_setpoint_value(0));
             ui_update_value_kp(ctrl_get_kp_value(0));
             ui_update_value_ki(ctrl_get_ki_value(0));

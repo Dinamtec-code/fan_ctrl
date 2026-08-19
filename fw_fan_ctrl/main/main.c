@@ -22,9 +22,9 @@ void sys_init_task(void *pvParameter)
 void app_main(void)
 {
 
-
     scpi_engine_init();
     tmc_hal_init();
+    ctrl_init();
 
     // Creamos una tarea estatica para inicializar todos los modulos del sistema.
     xTaskCreatePinnedToCore(
@@ -36,5 +36,4 @@ void app_main(void)
         NULL,
         1 // Anclado al Core 1 (PRO_CPU es 0, APP_CPU es 1)
     );
-    //ctrl_init();
 }

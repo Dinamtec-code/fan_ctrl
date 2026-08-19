@@ -21,16 +21,13 @@ void ctrl_init(void)
         "Controller Task",    // Nombre (para depuración)
         CTRL_TASK_STACK_SIZE, // Tamaño de la pila
         NULL,                 // Parámetro de entrada
-        4,                    // Prioridad
+        3,                    // Prioridad
         x_ctrl_TaskStack,     // Arreglo estático para la pila
         &x_ctrl_TaskBuffer,   // Estructura estática para el TCB
         0                     // Anclado al Core 1 (APP_CPU)
     );
-
     pwm_init();
 }
-
-
 
 void ctrl_task(void *vpParameter)
 {
@@ -49,16 +46,21 @@ void ctrl_task(void *vpParameter)
                 switch (ctrl_get_controller_type(i))
                 {
                 case CTRL_OPEN:
-                    update_duty(ctrl_get_setpoint_value(i), i);
+                    ctrl_set_duty_value(0, 15);
+                    //                    ctrl_set_duty_value(i, ctrl_get_setpoint_value((uint8_t)i));
+                    //                    ctrl_pwm_update_duty(ctrl_get_setpoint_value((uint8_t)i), i);
                     break;
                 case CTRL_PID:
-                    update_duty(1000, i);
+                    // ctrl_pwm_update_duty(1000, i);
+                    ctrl_set_duty_value(0, 37);
                     break;
+                default:
+                    ctrl_set_duty_value(0, 50);
                 }
             }
             else
             {
-                update_duty(0, i);
+                ctrl_pwm_update_duty(0, i);
             }
         }
     }

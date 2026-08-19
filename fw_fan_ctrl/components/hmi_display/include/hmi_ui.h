@@ -12,7 +12,8 @@ extern "C"
 
     // Esta función se puedes llamar desde tu Tarea estática, asegurándote
     // de usar los mutex (lvgl_port_lock)
-    void ui_update_values(float speed, float duty);
+    void ui_update_value_speed(float speed);
+    void ui_update_value_duty(float duty);
     void ui_update_value_point(float sp);
     void ui_update_value_kp(float kp);
     void ui_update_value_ki(float ki);

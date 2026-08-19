@@ -2,8 +2,8 @@
 
 static bool data_update = false;
 /* --- Variables de estado y parámetros del controlador --- */
-static float speed_history_buffer[SPEED_BUFFER_SIZE] = {0};
-static float duty_history_buffer[SPEED_BUFFER_SIZE] = {0};
+static float speed_history_buffer[SPEED_BUFFER_SIZE];
+static float duty_history_buffer[SPEED_BUFFER_SIZE];
 
 /* --- Variables de estado y parámetros del controlador --- */
 
@@ -12,8 +12,8 @@ static bool output_state[CTRL_NUM_CHANNELS] = {false, false};
 ctrl_type_t controller_type[CTRL_NUM_CHANNELS] = {CTRL_OPEN, CTRL_OPEN};
 
 ctrl_param_t set_point[CTRL_NUM_CHANNELS] = {
-    {.value = 100.0f, .max = 8000.0f, .min = 100.0f},
-    {.value = 100.0f, .max = 8000.0f, .min = 100.0f}};
+    {.value = 010.0f, .max = 8000.0f, .min = 100.0f},
+    {.value = 010.0f, .max = 8000.0f, .min = 100.0f}};
 
 ctrl_param_t duty[CTRL_NUM_CHANNELS] = {
     {.value = 0.0f, .max = 100.0f, .min = 0.0f},
@@ -57,14 +57,18 @@ static inline float clampf(float val, float min, float max)
 static inline void param_set_value(ctrl_param_t params[], uint8_t ch, float val)
 {
     if (ch >= CTRL_NUM_CHANNELS)
+    {
         return;
+    }
     params[ch].value = clampf(val, params[ch].min, params[ch].max);
 }
 
 static inline void param_set_min(ctrl_param_t params[], uint8_t ch, float min)
 {
     if (ch >= CTRL_NUM_CHANNELS)
+    {
         return;
+    }
     params[ch].min = min;
     if (params[ch].value < params[ch].min)
     {
@@ -75,7 +79,9 @@ static inline void param_set_min(ctrl_param_t params[], uint8_t ch, float min)
 static inline void param_set_max(ctrl_param_t params[], uint8_t ch, float max)
 {
     if (ch >= CTRL_NUM_CHANNELS)
+    {
         return;
+    }
     params[ch].max = max;
     if (params[ch].value > params[ch].max)
     {
@@ -86,21 +92,27 @@ static inline void param_set_max(ctrl_param_t params[], uint8_t ch, float max)
 static inline float param_get_value(const ctrl_param_t params[], uint8_t ch)
 {
     if (ch >= CTRL_NUM_CHANNELS)
+    {
         return -1.0f;
+    }
     return params[ch].value;
 }
 
 static inline float param_get_min(const ctrl_param_t params[], uint8_t ch)
 {
     if (ch >= CTRL_NUM_CHANNELS)
+    {
         return -1.0f;
+    }
     return params[ch].min;
 }
 
 static inline float param_get_max(const ctrl_param_t params[], uint8_t ch)
 {
     if (ch >= CTRL_NUM_CHANNELS)
+    {
         return -1.0f;
+    }
     return params[ch].max;
 }
 

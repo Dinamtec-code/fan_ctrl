@@ -8,7 +8,7 @@ extern "C"
 {
 #endif
     void pwm_init(void);
-    void update_duty(float duty, uint8_t channel);
+    void ctrl_pwm_update_duty(float duty, uint8_t channel);
 
 #ifdef __cplusplus
 }
