@@ -134,21 +134,17 @@ void display_init(void)
     vTaskDelete(NULL);
 }
 
-static float speed = 0;
+static ctrl_sensor_data_t mi_dato;
+static ctrl_buffer_data_t *buffer_canal_1 = &ctrl_sensor_buffers[1];
 
 void ui_task(void *pvParameter)
 {
     vTaskDelay(pdMS_TO_TICKS(2000));
     while (1)
     {
-        // 1. Haces tu lógica y cálculos normalmente
-        speed += 1.1;
+        buffer_canal_1->pop(buffer_canal_1, &mi_dato);
 
-        if (speed > 8000)
-        {
-            speed = 0.0;
-        }
-        ui_update_value_speed(speed);
+        ui_update_value_speed(mi_dato.speed);
         ui_update_value_duty(ctrl_get_duty_value(0));
 
         if (ctrl_data_get_update())

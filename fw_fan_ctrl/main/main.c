@@ -21,7 +21,6 @@ void sys_init_task(void *pvParameter)
 
 void app_main(void)
 {
-
     scpi_engine_init();
     tmc_hal_init();
     ctrl_init();

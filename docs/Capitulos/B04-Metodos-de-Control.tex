@@ -1,0 +1,43 @@
+\chapter[Metodos de control ]{Metodos de control}
+\label{cp:metodos-control}
+
+\section{Controladores}
+Aunque se tendran 2 metodos de control en realida solo uno controlara de forma activa la velocidad del ventilador. La otra forma de control será el propio lazo abierto donde el setpoint se le pasará directamente al duty y por lo tanto los minites del setpoint y los del duty limitaran la salida.
+
+
+\section{Secciones del sistema de control}
+El sistema de control se dividira en 4 secciones:
+\begin{itemize}
+    \item \textbf{Control Task:} Es la que se encargara periodicamente de actualizar el estado de la salida. Tambien contendrá las esctructuras de datos propias de los algoritmos de control.
+    \item \textbf{Control Data:} Esta sección tendra todos los parametros del controlador y sus limites. Tambien las deficiciones de las estructuras de datos usadas y los buffers de salida de medición en el que se guardaran las velocidades medidas. Todos los parametros ademas de su balor tendran limites que acotaran los valores que aceptara el parametro.
+    \item \textbf{Control PWM:} Contiene la api para controlar cada salida. En principio:
+    \begin{itemize}
+        \item Inicializar el periferico LEDC para cada canal.
+        \item Encender y apagar la tensión en cada canal. 
+        \item Establecer el PWM para cada canal con la implementacion del NCO.
+    \end{itemize}
+    \item \textbf{Control Sensor:} Se encargara de medir la velocidad a partir de la señal del cacometro de cada ventilador. Se encarga de:
+    \begin{itemize}
+        \item Inicializar el periferico MCPWM.
+        \item Atender las interrupciones registrando la marca temporal del evento y notificando a la tarea de control para tener cero jitter. Tambien se calcularan los periodos dentro de la ISR ya que identificar el origen del evento para informarlo es todo lo que necesitamos guardarlo.
+        \item Calcular la velocidad a patir de los pulsos por revoluciónm y la base de tiempo del timer.
+        \item Registrar la velocidad y la marca temporal en los buffer de medición.
+    \end{itemize}
+    \item 
+\end{itemize}
+
+\section{Open Loop}
+Este metodo solo va a mapear el setpoint en la salida del PWM actualizando esta cada 25ms como máximo para bajas velocidades (el ventilador con 2ppr gira a menos de 600RPM).
+
+\section{PID Loop}
+Este medodo como lo dice su nombre sera un control pid pero a diferencia de los pid rapidos de alta eficiencia no sera a una tasa fija de actualizaciones por segundo sino que se actualizará por los eventos del sensor ahorrandonos la estimación de la velocidad del sensor por usar esta asincronicamente.
+El control mas eficiente es el incremental mapendo todas las operaciones del control en un FIR
+\begin{align*}
+    y[n] &= P_p \cdot x[n] + P_i \cdot \sum_{i = 0}^{n} x[i]  \cdot \Delta T[i]+ \fract{P_d}{\Delta T[n]} \cdot (x[n]-x[n-1]) \\
+    y[n-1] &= P_p \cdot x[n-1] + P_i \cdot \sum_{i = 0}^{n-1} x[i] \cdot \Delta T[i] + \fract{P_d}{\Delta T[n-1]} \cdot (x[n-1]-x[n-2]) \\
+    y[n] - y[n-1] &= P_p \cdot ( x[n] - x[n-1] ) + P_i \cdot (\sum_{i = 0}^{n} x[i] \cdot \Delta T[i]- \sum_{i = 0}^{n-1} x[i] \cdot \Delta T[i]) + P_d \cdot (\fract{x[n]-x[n-1]}{\Delta T[n]}-\fract{x[n-1]-x[n-2]}{\Delta T[n-1]}) \\
+    y[n] - y[n-1] &= P_p \cdot ( x[n] - x[n-1] ) + P_i \cdot (\sum_{i = 0}^{n} x[i] \cdot \Delta T[i]- \sum_{i = 0}^{n-1} x[i] \cdot \Delta T[i]) + P_d \cdot (\fract{x[n]-x[n-1]}{\Delta T[n]}-\fract{x[n-1]-x[n-2]}{\Delta T[n-1]}) \\
+    y[n] &= y[n-1] + P_p \cdot  x[n] - P_p \cdot x[n-1]  + P_i \cdot \Delta T[n] \cdot x[n] + \fract{P_d}{\Delta T } \cdot x[n] - \fract{P_d}{\Delta T } \cdot 2 \cdot x[n-1] + \fract{P_d}{\Delta T } \cdot x[n-2] \\
+    y[n] &= y[n-1] + (P_p  + P_i \cdot \Delta T[n] + \fract{P_d}{\Delta T } ) \cdot x[n] - (2 \cdot \fract{P_d}{\Delta T[n] } - P_p ) \cdot x[n-1] + \fract{P_d}{\Delta T } \cdot x[n-2] \\
+\end{align*}
+

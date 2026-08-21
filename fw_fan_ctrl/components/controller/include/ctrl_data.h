@@ -1,5 +1,6 @@
 #ifndef CONTROLLER_DATA_H_
 #define CONTROLLER_DATA_H_
+#include "freertos/FreeRTOS.h"
 #include "stdint.h"
 #include "stdbool.h"
 
@@ -8,7 +9,7 @@ extern "C"
 {
 #endif
 
-#define SPEED_BUFFER_SIZE 4096
+#define SENSOR_BUFFER_SIZE 4096
 #define CTRL_NUM_CHANNELS 2
 
     typedef enum
@@ -23,6 +24,34 @@ extern "C"
         float max;
         float min;
     } ctrl_param_t;
+
+    // Estructura de un punto de dato completo
+    typedef struct
+    {
+        float speed;
+        uint64_t timestamp_us;
+    } ctrl_sensor_data_t;
+
+    // Declaración adelantada (Forward declaration) para usarla en los punteros a función
+    typedef struct ctrl_buffer_data ctrl_buffer_data_t;
+
+    typedef struct ctrl_buffer_data
+    {
+        ctrl_sensor_data_t *data;
+        size_t fifo_head;      // Donde escribimos
+        size_t fifo_tail;      // De donde leemos
+        size_t fifo_count;     // Elementos actuales en el buffer
+        portMUX_TYPE spinlock; // Spinlock independiente para este canal
+
+        // Métodos (reciben un puntero a sí mismos "self")
+        void (*push)(ctrl_buffer_data_t *self, float speed, uint64_t timestamp_us);
+        bool (*pop)(ctrl_buffer_data_t *self, ctrl_sensor_data_t *out_data);
+        bool (*get_latest)(ctrl_buffer_data_t *self, ctrl_sensor_data_t *out_data);
+        size_t (*get_count)(ctrl_buffer_data_t *self);
+    } ctrl_buffer_data_t;
+
+    // Exponemos un arreglo de manejadores, uno para cada canal
+    extern ctrl_buffer_data_t ctrl_sensor_buffers[CTRL_NUM_CHANNELS];
 
     bool ctrl_data_get_update(void);
 

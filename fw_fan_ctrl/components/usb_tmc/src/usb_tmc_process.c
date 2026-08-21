@@ -134,12 +134,12 @@ scpi_result_t cmd_ctrl_sp(scpi_t *context)
 
 static scpi_result_t cmd_pid_kp_q(scpi_t *context)
 {
-    int32_t channel;
 
+    int32_t numbers[1];
     // 1. Obtener el número de canal del nodo raíz (ej. SOURce1 -> 1)
     // El último parámetro es el valor por defecto si el usuario envía "SOUR:TEMP..." sin número.
-    SCPI_CommandNumbers(context, &channel, 1, 1);
-
+    SCPI_CommandNumbers(context, numbers, 1, 1);
+    int32_t channel = numbers[0];
     // 2. Validar que el canal exista en tu hardware
     if (channel < 1 || channel > 2)
     {
@@ -152,21 +152,15 @@ static scpi_result_t cmd_pid_kp_q(scpi_t *context)
 
 static scpi_result_t cmd_pid_kp(scpi_t *context)
 {
-    int32_t channel;
+    int32_t numbers[1];
     float kp;
     // 1. Obtener el canal
-    SCPI_CommandNumbers(context, &channel, 1, 1);
-
+    SCPI_CommandNumbers(context, numbers, 1, 1);
+    int32_t channel = numbers[0];
     // 2. Validar que el canal exista en tu hardware
     if (channel < 1 || channel > 2)
     {
         SCPI_ErrorPush(context, SCPI_ERROR_INVALID_SUFFIX);
-        return SCPI_RES_ERR;
-    }
-
-    // 3. Extraer el parámetro enviado por el usuario
-    if (!SCPI_ParamFloat(context, &kp, TRUE))
-    {
         return SCPI_RES_ERR;
     }
 
@@ -210,12 +204,6 @@ static scpi_result_t cmd_pid_ki(scpi_t *context)
         return SCPI_RES_ERR;
     }
 
-    // 3. Extraer el parámetro enviado por el usuario
-    if (!SCPI_ParamFloat(context, &ki, TRUE))
-    {
-        return SCPI_RES_ERR;
-    }
-
     if (SCPI_ParamFloat(context, &ki, true))
     {
         ctrl_set_ki_value((uint8_t)channel - 1, ki);
@@ -252,11 +240,6 @@ static scpi_result_t cmd_pid_kd(scpi_t *context)
     if (channel < 1 || channel > 2)
     {
         SCPI_ErrorPush(context, SCPI_ERROR_INVALID_SUFFIX);
-        return SCPI_RES_ERR;
-    }
-
-    if (!SCPI_ParamFloat(context, &kd, TRUE))
-    {
         return SCPI_RES_ERR;
     }
 
@@ -350,7 +333,7 @@ static scpi_result_t cmd_sour_outp_q(scpi_t *context)
         return SCPI_RES_ERR;
     }
 
-    SCPI_ResultBool(context, ctrl_get_output_state((uint8_t)channel));
+    SCPI_ResultBool(context, ctrl_get_output_state((uint8_t)channel - 1));
     return SCPI_RES_OK;
 }
 
@@ -369,13 +352,9 @@ static scpi_result_t cmd_sour_outp(scpi_t *context)
 
     if (!SCPI_ParamBool(context, &on, true))
     {
-    }
-
-    if (!SCPI_ParamBool(context, &on, true))
-    {
         return SCPI_RES_ERR;
     }
-    ctrl_set_output_state((uint8_t)channel, (bool)on);
+    ctrl_set_output_state((uint8_t)channel - 1, (bool)on);
 
     return SCPI_RES_OK;
 }
@@ -495,13 +474,9 @@ static const scpi_command_t scpi_commands[] = {
     /* Medición */
     {.pattern = "MEASure:SPEED#?", .callback = cmd_meas_speed, .tag = 0},
     {.pattern = "MEASure:SPEED#?", .callback = cmd_meas_speed, .tag = 0},
-
     /* Setpoint */
     {.pattern = "SOURce#:CONTrol:SETPOint?", .callback = cmd_ctrl_sp_q, .tag = 0},
     {.pattern = "SOURce#:CONTrol:SETPOint", .callback = cmd_ctrl_sp, .tag = 0},
-    {.pattern = "SOURce#:CONTrol:SETPOint?", .callback = cmd_ctrl_sp_q, .tag = 0},
-    {.pattern = "SOURce#:CONTrol:SETPOint", .callback = cmd_ctrl_sp, .tag = 0},
-
     /* PID */
     {.pattern = "SOURce#:CONTrol:PID:KP?", .callback = cmd_pid_kp_q, .tag = 0},
     {.pattern = "SOURce#:CONTrol:PID:KP", .callback = cmd_pid_kp, .tag = 0},

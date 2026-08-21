@@ -72,7 +72,7 @@ void ctrl_pwm_update_duty(float duty, uint8_t channel)
     if (channel >= 2)
         return; // Proteger contra índices fuera de rango del array
 
-    // ctrl_set_duty_value(channel, duty);
+    ctrl_set_duty_value(channel, duty);
 
     // Conversión a resolución de 15 bits. EL duty lo tomamos del registo de datos que ya registró y acotó el valor.
     uint32_t target_15bit = (uint32_t)(ctrl_get_duty_value(channel) * (float)MAX_DUTY_15) / 100;

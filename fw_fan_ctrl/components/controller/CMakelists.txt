@@ -4,7 +4,8 @@ idf_component_register(
     "src/ctrl_pid.c"
     "src/ctrl_task.c"
     "src/ctrl_pwm.c"
+    "src/ctrl_sensor.c"
 
     INCLUDE_DIRS "include"
-    REQUIRES freertos driver esp-dsp espressif__esp-dsp esp_driver_ledc esp_driver_gpio
+    REQUIRES freertos driver esp_driver_mcpwm log esp-dsp esp_driver_ledc esp_driver_gpio esp_timer
 )

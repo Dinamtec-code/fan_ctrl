@@ -1,9 +1,108 @@
 #include "ctrl_data.h"
+#include "ctrl_sensor.h"
+
+// Memoria estática para los datos
+static ctrl_sensor_data_t ctrl_sensor_data_buffer[CTRL_NUM_CHANNELS][SENSOR_BUFFER_SIZE];
+
+/* ========================================================================== */
+/*                          MÉTODOS DEL BUFFER (OOP)                          */
+/* ========================================================================== */
+
+static void ctrl_data_buffer_push(ctrl_buffer_data_t *self, float speed, uint64_t timestamp_us)
+{
+    taskENTER_CRITICAL(&self->spinlock);
+
+    self->data[self->fifo_head].speed = speed;
+    self->data[self->fifo_head].timestamp_us = timestamp_us;
+
+    self->fifo_head = (self->fifo_head + 1) % SENSOR_BUFFER_SIZE;
+
+    if (self->fifo_count < SENSOR_BUFFER_SIZE)
+    {
+        self->fifo_count++;
+    }
+    else
+    {
+        // El buffer está lleno, sobrescribimos el más viejo y avanzamos la cola
+        self->fifo_tail = (self->fifo_tail + 1) % SENSOR_BUFFER_SIZE;
+    }
+
+    taskEXIT_CRITICAL(&self->spinlock);
+}
+
+static bool ctrl_data_buffer_pop(ctrl_buffer_data_t *self, ctrl_sensor_data_t *out_data)
+{
+    bool has_data = false;
+    taskENTER_CRITICAL(&self->spinlock);
+
+    if (self->fifo_count > 0)
+    {
+        *out_data = self->data[self->fifo_tail];
+        self->fifo_tail = (self->fifo_tail + 1) % SENSOR_BUFFER_SIZE;
+        self->fifo_count--;
+        has_data = true;
+    }
+
+    taskEXIT_CRITICAL(&self->spinlock);
+    return has_data;
+}
+
+static bool ctrl_data_buffer_get_latest(ctrl_buffer_data_t *self, ctrl_sensor_data_t *out_data)
+{
+    bool has_data = false;
+    taskENTER_CRITICAL(&self->spinlock);
+
+    if (self->fifo_count > 0)
+    {
+        // El último dato escrito está una posición antes de fifo_head
+        size_t latest_idx = (self->fifo_head == 0) ? (SENSOR_BUFFER_SIZE - 1) : (self->fifo_head - 1);
+        *out_data = self->data[latest_idx];
+        has_data = true;
+    }
+
+    taskEXIT_CRITICAL(&self->spinlock);
+    return has_data;
+}
+
+static size_t ctrl_data_buffer_get_count(ctrl_buffer_data_t *self)
+{
+    size_t count = 0;
+    taskENTER_CRITICAL(&self->spinlock);
+    count = self->fifo_count;
+    taskEXIT_CRITICAL(&self->spinlock);
+    return count;
+}
+
+/* ========================================================================== */
+/*                     INICIALIZACIÓN DE LOS MANEJADORES                      */
+/* ========================================================================== */
+
+// Creamos un arreglo de buffers para acceder fácilmente mediante el índice del canal
+ctrl_buffer_data_t ctrl_sensor_buffers[CTRL_NUM_CHANNELS] = {
+    [0] = {// primer canal
+           .data = &ctrl_sensor_data_buffer[0][0],
+           .fifo_head = 0,
+           .fifo_tail = 0,
+           .fifo_count = 0,
+           .spinlock = portMUX_INITIALIZER_UNLOCKED,
+           .push = ctrl_data_buffer_push,
+           .pop = ctrl_data_buffer_pop,
+           .get_latest = ctrl_data_buffer_get_latest,
+           .get_count = ctrl_data_buffer_get_count},
+    [1] = {// segundo canal
+           .data = &ctrl_sensor_data_buffer[1][0],
+           .fifo_head = 0,
+           .fifo_tail = 0,
+           .fifo_count = 0,
+           .spinlock = portMUX_INITIALIZER_UNLOCKED,
+           .push = ctrl_data_buffer_push,
+           .pop = ctrl_data_buffer_pop,
+           .get_latest = ctrl_data_buffer_get_latest,
+           .get_count = ctrl_data_buffer_get_count} // fin de la inicializacion
+};
+
 
 static bool data_update = false;
-/* --- Variables de estado y parámetros del controlador --- */
-static float speed_history_buffer[SPEED_BUFFER_SIZE];
-static float duty_history_buffer[SPEED_BUFFER_SIZE];
 
 /* --- Variables de estado y parámetros del controlador --- */
 
@@ -12,8 +111,8 @@ static bool output_state[CTRL_NUM_CHANNELS] = {false, false};
 ctrl_type_t controller_type[CTRL_NUM_CHANNELS] = {CTRL_OPEN, CTRL_OPEN};
 
 ctrl_param_t set_point[CTRL_NUM_CHANNELS] = {
-    {.value = 010.0f, .max = 8000.0f, .min = 100.0f},
-    {.value = 010.0f, .max = 8000.0f, .min = 100.0f}};
+    {.value = 01.0f, .max = 8000.0f, .min = 0.0f},
+    {.value = 01.0f, .max = 8000.0f, .min = 0.0f}};
 
 ctrl_param_t duty[CTRL_NUM_CHANNELS] = {
     {.value = 0.0f, .max = 100.0f, .min = 0.0f},
@@ -21,15 +120,15 @@ ctrl_param_t duty[CTRL_NUM_CHANNELS] = {
 
 ctrl_param_t kp[CTRL_NUM_CHANNELS] = {
     {.value = 0.0f, .max = 10.0f, .min = 0.0f},
-    {.value = 0.0f, .max = 100.0f, .min = 0.0f}};
+    {.value = 0.0f, .max = 10.0f, .min = 0.0f}};
 
 ctrl_param_t ki[CTRL_NUM_CHANNELS] = {
     {.value = 0.0f, .max = 10.0f, .min = 0.0f},
-    {.value = 0.0f, .max = 100.0f, .min = 0.0f}};
+    {.value = 0.0f, .max = 10.0f, .min = 0.0f}};
 
 ctrl_param_t kd[CTRL_NUM_CHANNELS] = {
     {.value = 0.0f, .max = 10.0f, .min = 0.0f},
-    {.value = 0.0f, .max = 100.0f, .min = 0.0f}};
+    {.value = 0.0f, .max = 10.0f, .min = 0.0f}};
 
 bool ctrl_data_get_update(void)
 {
