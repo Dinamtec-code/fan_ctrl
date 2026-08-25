@@ -203,7 +203,7 @@ void ui_init(void)
     int info_height = 21;
 
     const char *pid_title_item[] = {"set:", "kp:", "ki:", "kd:"};
-    const char *pid_cfg_values[] = {"0000.0", "000.0", "000.0", "000.0"};
+    const char *pid_cfg_values[] = {"0000.0", "00.000", "00.000", "00.000"};
     label_set_p_value = lv_label_create(scr);
     label_set_kp_value = lv_label_create(scr);
     label_set_ki_value = lv_label_create(scr);
@@ -332,7 +332,7 @@ void ui_update_value_point(float sp)
 
 void ui_update_value_kp(float kp)
 {
-    snprintf(buf_kp, sizeof(buf_kp), "%06.1f", kp);
+    snprintf(buf_kp, sizeof(buf_kp), "%06.4f", kp);
     if (lvgl_port_lock(0))
     {
         lv_label_set_text(label_set_kp_value, buf_kp);
@@ -342,7 +342,7 @@ void ui_update_value_kp(float kp)
 
 void ui_update_value_ki(float ki)
 {
-    snprintf(buf_ki, sizeof(buf_ki), "%06.1f", ki);
+    snprintf(buf_ki, sizeof(buf_ki), "%06.4f", ki);
     if (lvgl_port_lock(0))
     {
         lv_label_set_text(label_set_ki_value, buf_ki);
@@ -352,7 +352,7 @@ void ui_update_value_ki(float ki)
 
 void ui_update_value_kd(float kd)
 {
-    snprintf(buf_kd, sizeof(buf_kd), "%06.1f", kd);
+    snprintf(buf_kd, sizeof(buf_kd), "%06.4f", kd);
     if (lvgl_port_lock(0))
     {
         lv_label_set_text(label_set_kd_value, buf_kd); // CORREGIDO: label_set_kd_value

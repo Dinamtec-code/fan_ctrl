@@ -195,7 +195,7 @@ bool tud_usbtmc_check_abort_bulk_in_cb(usbtmc_check_abort_bulk_rsp_t *rsp)
 bool tud_usbtmc_initiate_clear_cb(uint8_t *tmcResult)
 {
     ESP_LOGI(TAG_TMC, "Init clear");
-    *tmcResult = USBTMC_STATUS_SUCCESS;
+    *tmcResult = USBTMC_STATUS_SUCCESS; 
     return true;
 }
 

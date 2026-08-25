@@ -101,9 +101,6 @@ ctrl_buffer_data_t ctrl_sensor_buffers[CTRL_NUM_CHANNELS] = {
            .get_count = ctrl_data_buffer_get_count} // fin de la inicializacion
 };
 
-
-static bool data_update = false;
-
 /* --- Variables de estado y parámetros del controlador --- */
 
 static bool output_state[CTRL_NUM_CHANNELS] = {false, false};
@@ -130,6 +127,9 @@ ctrl_param_t kd[CTRL_NUM_CHANNELS] = {
     {.value = 0.0f, .max = 10.0f, .min = 0.0f},
     {.value = 0.0f, .max = 10.0f, .min = 0.0f}};
 
+static bool data_update = false;
+static bool display_data_update = false;
+
 bool ctrl_data_get_update(void)
 {
     bool data = data_update;
@@ -137,8 +137,15 @@ bool ctrl_data_get_update(void)
     return data;
 }
 
+bool ctrl_dilplay_data_get_update(void)
+{
+    bool data = display_data_update;
+    display_data_update = false;
+    return data;
+}
 static inline void set_data_update()
 {
+    display_data_update = true;
     data_update = true;
 }
 

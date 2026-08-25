@@ -1,10 +1,13 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "esp_log.h"
 #include "ctrl_data.h"
 #include "ctrl_pid.h"
 #include "ctrl_pwm.h"
 #include "ctrl_sensor.h"
 #include "ctrl_task.h"
+
+const static char *TAG_CTRL = "ctrl_task";
 
 // 1. Definir el tamaño en BYTES (En ESP-IDF, el stack se mide en bytes, no en words)
 #define CTRL_TASK_STACK_SIZE 4 * 1024
@@ -33,7 +36,17 @@ static void control_runtime(uint8_t channel, float speed)
         }
         else
         {
-            // Opcional: Ejecutar PID con la velocidad anterior o una calculada con el timestamp actual
+            if (ctrl_data_get_update())
+            {
+                ctrl_pid_update_coeff(0);
+                ctrl_pid_update_coeff(1);
+            }
+
+            float error = ctrl_get_setpoint_value(channel) - speed;
+            float period_sec = ctrl_get_last_period_seg(channel);
+
+            float pwm = dsp_pid_update(error, period_sec, channel);
+            ctrl_pwm_update_duty(pwm, channel);
         }
         break;
     }
@@ -61,8 +74,8 @@ void ctrl_task(void *vpParameter)
 
     while (1)
     {
-        // Bloquea la tarea hasta recibir notificación O timeout
-        BaseType_t xStatus = xTaskNotifyWait(0x00, 0xFFFFFFFF, &eventos_notificados, pdMS_TO_TICKS(50));
+        // Bloquea la tarea hasta recibir notificación o timeout.
+        BaseType_t xStatus = xTaskNotifyWait(0x00, 0xFFFFFFFF, &eventos_notificados, pdMS_TO_TICKS(100));
 
         if (xStatus == pdTRUE)
         {
@@ -78,17 +91,17 @@ void ctrl_task(void *vpParameter)
                 // Limpia el bit actual para seguir con el próximo (si lo hubiera)
                 eventos_pendientes &= ~(1UL << i);
 
-                // Calcular velocidad
+                // Calcular velocidad del evento de captura i
+                ctrl_asinc_update_speed(i);
+                // obtener velocidad para el controlador
                 float speed_rpm = ctrl_get_sensor_speed(i);
-                // Actualizar ctrl_data
-                // telemetry_buffer_push(i, speed_rpm);
 
                 // Verificaciones de seguridad
                 if (i < CTRL_NUM_CHANNELS && ctrl_get_output_state(i))
                 {
-
                     // 3. Ejecutar algoritmo de control
                     control_runtime(i, speed_rpm);
+                    ESP_LOGI(TAG_CTRL, "speed: %8f", speed_rpm);
                 }
             }
         }
@@ -96,11 +109,13 @@ void ctrl_task(void *vpParameter)
         {
             // === FLUJO 2: TIMEOUT (Pasaron 50ms sin eventos de ningún canal) ===
             // Aquí sí se requiere un for para actualizar lazos abiertos o forzar apagados
+            float speed_rpm;
             for (uint8_t i = 0; i < CTRL_NUM_CHANNELS; i++)
             {
                 if (!ctrl_get_output_state(i))
                 {
-                    ctrl_pwm_update_duty(0, i);
+                    speed_rpm = ctrl_get_bounded_speed(i);
+                    control_runtime(i, speed_rpm);
                     continue;
                 }
             }

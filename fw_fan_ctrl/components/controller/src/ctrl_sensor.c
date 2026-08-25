@@ -13,6 +13,8 @@ extern TaskHandle_t x_ctrl_TaskHandle;
 
 const static char *TAG = "ctrl_capture";
 
+#define RPM_CONST_COEFICIENT 60.0f * CTRL_SENSOR_TIMER_RES_HZ / CTRL_SENSOR_PPR
+
 static capture_edges_t edge_history[CTRL_NUM_CHANNELS];
 static isr_to_task_data_t shared_data[CTRL_NUM_CHANNELS];
 static mcpwm_cap_timer_handle_t cap_timer_handle = NULL;
@@ -36,7 +38,6 @@ static bool isr_captura(mcpwm_cap_channel_handle_t cap_chan, const mcpwm_capture
 
     // Novedad: Guardamos el tiempo del sistema (64 bits reales, nunca desborda en la vida útil)
     shared_data[canal].timestamp_hw_us = esp_timer_get_time();
-
     taskEXIT_CRITICAL_ISR(&sensor_spinlock);
 
     if (x_ctrl_TaskHandle != NULL)
@@ -54,13 +55,9 @@ static inline void send_speed(float speed, uint8_t channel)
     taskEXIT_CRITICAL(&sensor_spinlock);
 }
 
-float ctrl_get_sensor_speed(uint8_t channel)
+// Esta funcion se llama desde la tarea de control periodica cuando es despertada por un evento de captura. Para no calcular la velocidad dentro de la ISR se calculara y guardara acá.
+void ctrl_asinc_update_speed(uint8_t channel)
 {
-
-    if (channel >= CTRL_NUM_CHANNELS)
-    {
-        return 0.0f;
-    }
     uint32_t period = 0;
     uint64_t ultimo_pulso_us = 0;
 
@@ -69,29 +66,68 @@ float ctrl_get_sensor_speed(uint8_t channel)
     ultimo_pulso_us = shared_data[channel].timestamp_hw_us;
     taskEXIT_CRITICAL(&sensor_spinlock);
 
-    if (period == 0)
+    float speed = RPM_CONST_COEFICIENT / (float)period;
+    ctrl_buffer_data_t *buffer = &ctrl_sensor_buffers[channel];
+    buffer->push(buffer, speed, shared_data[channel].timestamp_hw_us);
+}
+
+float ctrl_get_sensor_speed(uint8_t channel)
+{
+    if (channel >= CTRL_NUM_CHANNELS)
     {
         return 0.0f;
     }
+    ctrl_buffer_data_t *buffer = &ctrl_sensor_buffers[channel];
+    ctrl_sensor_data_t data;
+    buffer->get_latest(buffer, &data);
+
     // Manejo de timeout usando el tiempo absoluto
     uint64_t tiempo_actual_us = esp_timer_get_time();
 
     // Ajusta CTRL_SENSOR_TIMEOUT_TICKS a su equivalente en microsegundos si es necesario
-    if ((tiempo_actual_us - ultimo_pulso_us) > CTRL_SENSOR_TIMEOUT_TICKS)
+    if ((tiempo_actual_us - data.timestamp_us) > CTRL_SENSOR_TIMEOUT_TICKS)
     {
         return 0.0f;
     }
+
+    return data.speed;
+}
+
+float ctrl_get_bounded_speed(uint8_t channel)
+{
+    uint32_t period = 0;
+    uint64_t ultimo_pulso_us = 0;
 
     taskENTER_CRITICAL(&sensor_spinlock);
     period = shared_data[channel].period_ticks;
     ultimo_pulso_us = shared_data[channel].timestamp_hw_us;
     taskEXIT_CRITICAL(&sensor_spinlock);
 
-    float speed = (60.0f * (float)CTRL_SENSOR_TIMER_RES_HZ) / ((float)period * (float)CTRL_SENSOR_PPR);
-    ctrl_buffer_data_t *buffer = &ctrl_sensor_buffers[channel];
-    buffer->push(buffer, speed, shared_data[channel].timestamp_hw_us);
-    ESP_LOGW(TAG, "velocidad medida: %f", speed);
-    return speed;
+    uint64_t time = esp_timer_get_time();
+    uint64_t bounded_period = 80 * (time - (ultimo_pulso_us)) + period;
+
+    float bounded_speed = (time < (ultimo_pulso_us + 500000)) ? ctrl_get_sensor_speed(channel) : RPM_CONST_COEFICIENT / (float)bounded_period;
+    if (bounded_speed < 6)
+    {
+        bounded_speed = 0.0f;
+    }
+    return bounded_speed;
+}
+
+float ctrl_get_last_period_seg(uint8_t channel)
+{
+    uint32_t period = 0;
+    uint64_t ultimo_pulso_us = 0;
+    uint64_t time = esp_timer_get_time();
+
+    taskENTER_CRITICAL(&sensor_spinlock);
+    period = shared_data[channel].period_ticks;
+    ultimo_pulso_us = shared_data[channel].timestamp_hw_us;
+    taskEXIT_CRITICAL(&sensor_spinlock);
+
+    uint64_t bounded_period = 80 * (time - ultimo_pulso_us) + period;
+
+    return ((float)bounded_period) / 8000000.0f;
 }
 
 void ctrl_sensor_init(void)
@@ -123,4 +159,9 @@ void ctrl_sensor_init(void)
     }
     ESP_ERROR_CHECK(mcpwm_capture_timer_enable(cap_timer_handle));
     ESP_ERROR_CHECK(mcpwm_capture_timer_start(cap_timer_handle));
+}
+
+isr_to_task_data_t *ctrl_get_sensor_data_handle(uint8_t channel)
+{
+    return &shared_data[channel];
 }

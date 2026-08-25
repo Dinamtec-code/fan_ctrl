@@ -9,7 +9,7 @@ extern "C"
 {
 #endif
 
-#define SENSOR_BUFFER_SIZE 4096
+#define SENSOR_BUFFER_SIZE 1024
 #define CTRL_NUM_CHANNELS 2
 
     typedef enum
@@ -54,6 +54,7 @@ extern "C"
     extern ctrl_buffer_data_t ctrl_sensor_buffers[CTRL_NUM_CHANNELS];
 
     bool ctrl_data_get_update(void);
+    bool ctrl_dilplay_data_get_update(void);
 
     /* --- SET_POINT --- */
     void ctrl_set_setpoint_value(uint8_t channel, float value);

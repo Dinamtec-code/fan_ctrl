@@ -9,14 +9,14 @@ extern "C"
 #endif
 
 // Parámetros de la medición
-#define CTRL_SENSOR_PPR 2U                                       // Pulsos por revolución del encoder
-#define CTRL_SENSOR_TIMER_RES_HZ 80000000U                       // Resolución del MCPWM Timer (ej. 80 MHz -> 1 tick = 12.5ns)
-#define CTRL_SENSOR_TIMEOUT_TICKS (CTRL_SENSOR_TIMER_RES_HZ / 2) // 500 ms sin flancos = 0 RPM
+#define CTRL_SENSOR_PPR 2U                 // Pulsos por revolución del encoder
+#define CTRL_SENSOR_TIMER_RES_HZ 80000000U // Resolución del MCPWM Timer (ej. 80 MHz -> 1 tick = 12.5ns)
+#define CTRL_SENSOR_TIMEOUT_TICKS (CTRL_SENSOR_TIMER_RES_HZ / 2)
 
     // Estructura optimizada para la ISR
     typedef struct
     {
-        uint32_t last_edges[1];
+        uint32_t last_edges[2];
     } capture_edges_t;
 
     // Datos compartidos entre ISR y Tarea
@@ -27,7 +27,11 @@ extern "C"
         float speed;
     } isr_to_task_data_t;
 
+    void ctrl_asinc_update_speed(uint8_t channel);
     float ctrl_get_sensor_speed(uint8_t channel);
+    float ctrl_get_bounded_speed(uint8_t channel);
+    float ctrl_get_last_period_seg(uint8_t channel);
+    isr_to_task_data_t *ctrl_get_sensor_data_handle(uint8_t channel);
     void ctrl_sensor_init(void);
 
 #ifdef __cplusplus

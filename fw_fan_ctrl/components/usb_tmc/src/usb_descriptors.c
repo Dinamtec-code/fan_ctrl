@@ -41,9 +41,13 @@ tusb_desc_device_t const desc_device = {
     .bLength = sizeof(tusb_desc_device_t),
     .bDescriptorType = TUSB_DESC_DEVICE,
     .bcdUSB = 0x0200,
-    .bDeviceClass = TUD_USBTMC_CLASS,          // 0x01 para descriptor de de tipo dispositivo
-    .bDeviceSubClass = TUD_USBTMC_SUBCLASS,    // 0xFE
-    .bDeviceProtocol = TUD_USBTMC_PROTO_488,   // 0x03
+    // .bDeviceClass = TUD_USBTMC_CLASS,        // 0x01 para descriptor de de tipo dispositivo
+    // .bDeviceSubClass = TUD_USBTMC_SUBCLASS,  // 0xFE
+    // .bDeviceProtocol = TUD_USBTMC_PROTO_488, // 0x03
+
+    .bDeviceClass = 0x00,                      // (CORREGIDO) Definido a nivel de interfaz
+    .bDeviceSubClass = 0x00,                   // (CORREGIDO)
+    .bDeviceProtocol = 0x00,                   // (CORREGIDO)
     .bMaxPacketSize0 = CFG_TUD_ENDPOINT0_SIZE, // 64 bytes para maximo tamaño de paquete de control
 
     .idVendor = USB_VID,
@@ -82,7 +86,8 @@ uint8_t const desc_bos[] = {
 // Callback débil de TinyUSB para devolver el BOS
 uint8_t const *tud_descriptor_bos_cb(void)
 {
-  return desc_bos;
+  return NULL;
+  //  return desc_bos;
 }
 
 uint8_t const desc_ms_os_20_features[] = {

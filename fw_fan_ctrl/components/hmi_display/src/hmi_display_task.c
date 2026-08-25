@@ -14,6 +14,8 @@
 #include "esp_heap_caps.h"
 #include "usb_tmc_process.h"
 #include "ctrl_data.h"
+#include "ctrl_sensor.h"
+#include "math.h"
 
 // --- Definición de Pines (Ajusta según tu placa) ---
 #define LCD_HOST SPI2_HOST
@@ -133,29 +135,45 @@ void display_init(void)
     // esp_lvgl_port se encarga de ejecutar la tarea del handler de LVGL internamente.
     vTaskDelete(NULL);
 }
-
-static ctrl_sensor_data_t mi_dato;
-static ctrl_buffer_data_t *buffer_canal_1 = &ctrl_sensor_buffers[1];
+uint32_t orden_filtro = 16;
+static float get_alpha()
+{
+    double fc = 1;
+    double fm = 50;
+    double correccion_cascada = sqrt(pow(2, ((1.0 / (double)orden_filtro) - 1.0)));
+    double alpha = 1.0 - exp(-2.0 * M_PI * (fc / fm) / correccion_cascada);
+    return (float)alpha;
+}
 
 void ui_task(void *pvParameter)
 {
-    vTaskDelay(pdMS_TO_TICKS(2000));
+    float bounded_speed;
+    float alpha = get_alpha();
+    float beta = 1.0f - alpha;
+    float ema_speed[orden_filtro];
+    vTaskDelay(pdMS_TO_TICKS(10));
     while (1)
     {
-        buffer_canal_1->pop(buffer_canal_1, &mi_dato);
 
-        ui_update_value_speed(mi_dato.speed);
+        bounded_speed = ctrl_get_sensor_speed(0);
+        ema_speed[0] = alpha * ema_speed[0] + beta * bounded_speed;
+        for (uint8_t i = 1; i < orden_filtro; i++)
+        {
+            ema_speed[i] = alpha * ema_speed[i] + beta * ema_speed[i - 1];
+        }
+
+        ui_update_value_speed(ema_speed[7]);
         ui_update_value_duty(ctrl_get_duty_value(0));
 
-        if (ctrl_data_get_update())
+        if (ctrl_dilplay_data_get_update())
         {
-            ui_update_value_point(ctrl_get_setpoint_value(0));
-            ui_update_value_kp(ctrl_get_kp_value(0));
-            ui_update_value_ki(ctrl_get_ki_value(0));
-            ui_update_value_kd(ctrl_get_kd_value(0));
-            ui_update_value_min(ctrl_get_duty_min(0));
-            ui_update_value_max(ctrl_get_duty_max(0));
         }
+        ui_update_value_point(ctrl_get_setpoint_value(0));
+        ui_update_value_kp(ctrl_get_kp_value(0));
+        ui_update_value_ki(ctrl_get_ki_value(0));
+        ui_update_value_kd(ctrl_get_kd_value(0));
+        ui_update_value_min(ctrl_get_duty_min(0));
+        ui_update_value_max(ctrl_get_duty_max(0));
         ui_update_out_state(ctrl_get_output_state(0));
         ui_update_ctrl_type(ctrl_get_controller_type(0));
         ui_update_error_mark(tmc_scpi_has_errors());
