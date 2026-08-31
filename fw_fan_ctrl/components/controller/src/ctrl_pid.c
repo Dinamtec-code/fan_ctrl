@@ -90,7 +90,7 @@ void ctrl_pid_state_reset(uint8_t channel)
     pid_handle[channel].kd_ts_prev = 0.0f;
 }
 
-float dsp_pid_update(float error, float period_sec, uint8_t channel)
+float dsp_pid_update(uint8_t channel, float error, float period_sec)
 {
     ctrl_pid_f32_t *pid = &pid_handle[channel];
 

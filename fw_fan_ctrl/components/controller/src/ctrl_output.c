@@ -1,6 +1,8 @@
 #include "driver/gpio.h"
 
+#include "ctrl_pwm.h"
 #include "ctrl_output.h"
+
 
 #define PIN_OUTPUT_1 47
 #define PIN_OUTPUT_2 48
@@ -16,6 +18,7 @@ void ctrl_output_init(void)
         .intr_type = GPIO_INTR_DISABLE                                   // Desactivar interrupciones
     };
     gpio_config(&io_conf); // Aplicar configuración
+    pwm_init();
 }
 
 void ctrl_output_state(uint8_t channel, bool state)

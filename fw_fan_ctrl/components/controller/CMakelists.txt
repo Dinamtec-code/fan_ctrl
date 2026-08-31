@@ -2,7 +2,7 @@ idf_component_register(
     SRCS 
     "src/ctrl_data.c"
     "src/ctrl_pid.c"
-    "src/ctrl_task.c"
+    "src/ctrl_runtime.c"
     "src/ctrl_pwm.c"
     "src/ctrl_sensor.c"
     "src/ctrl_output.c"

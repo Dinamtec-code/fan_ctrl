@@ -1,5 +1,5 @@
-#ifndef CONTROLLER_DATA_H_
-#define CONTROLLER_DATA_H_
+#ifndef CTRL_DATA_H_
+#define CTRL_DATA_H_
 #include "freertos/FreeRTOS.h"
 #include "stdint.h"
 #include "stdbool.h"
@@ -50,8 +50,8 @@ extern "C"
     ctrl_buffer_data_t *ctrl_get_buffers(uint8_t channel);
 
     void ctrl_buffer_data_init(void);
-    bool ctrl_data_get_update(void);
-    bool ctrl_dilplay_data_get_update(void);
+    bool ctrl_data_get_update(uint8_t channel);
+    bool ctrl_dislplay_data_get_update(uint8_t channel);
 
     /* --- SET_POINT --- */
     void ctrl_set_setpoint_value(uint8_t channel, float value);
@@ -104,4 +104,4 @@ extern "C"
 }
 #endif
 
-#endif /*CONTROLLER_DATA_H_*/
+#endif /*CTRL_DATA_H_*/

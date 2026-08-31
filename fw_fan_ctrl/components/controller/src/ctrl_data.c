@@ -168,26 +168,26 @@ ctrl_param_t kd[CTRL_NUM_CHANNELS] = {
     {.value = 0.0f, .max = 10.0f, .min = 0.0f},
     {.value = 0.0f, .max = 10.0f, .min = 0.0f}};
 
-static bool data_update = false;
-static bool display_data_update = false;
+static bool data_update[CTRL_NUM_CHANNELS] = {false};
+static bool display_data_update[CTRL_NUM_CHANNELS] = {false};
 
-bool ctrl_data_get_update(void)
+bool ctrl_data_get_update(uint8_t channel)
 {
-    bool data = data_update;
-    data_update = false;
+    bool data = data_update[channel];
+    data_update[channel] = false;
     return data;
 }
 
-bool ctrl_dilplay_data_get_update(void)
+bool ctrl_dislplay_data_get_update(uint8_t channel)
 {
-    bool data = display_data_update;
-    display_data_update = false;
+    bool data = display_data_update[channel];
+    display_data_update[channel] = false;
     return data;
 }
-static inline void set_data_update()
+static inline void set_data_update(uint8_t channel)
 {
-    display_data_update = true;
-    data_update = true;
+    display_data_update[channel] = true;
+    data_update[channel] = true;
 }
 
 /* --- Generic Parameter Helpers --- */
@@ -270,17 +270,17 @@ static inline float param_get_max(const ctrl_param_t params[], uint8_t ch)
 void ctrl_set_setpoint_value(uint8_t ch, float v)
 {
     param_set_value(set_point, ch, v);
-    set_data_update();
+    set_data_update(ch);
 }
 void ctrl_set_setpoint_min(uint8_t ch, float m)
 {
     param_set_min(set_point, ch, m);
-    set_data_update();
+    set_data_update(ch);
 }
 void ctrl_set_setpoint_max(uint8_t ch, float m)
 {
     param_set_max(set_point, ch, m);
-    set_data_update();
+    set_data_update(ch);
 }
 float ctrl_get_setpoint_value(uint8_t ch) { return param_get_value(set_point, ch); }
 float ctrl_get_setpoint_min(uint8_t ch) { return param_get_min(set_point, ch); }
@@ -293,17 +293,17 @@ float ctrl_get_setpoint_max(uint8_t ch) { return param_get_max(set_point, ch); }
 void ctrl_set_duty_value(uint8_t ch, float v)
 {
     param_set_value(duty, ch, v);
-    set_data_update();
+    set_data_update(ch);
 }
 void ctrl_set_duty_min(uint8_t ch, float m)
 {
     param_set_min(duty, ch, m);
-    set_data_update();
+    set_data_update(ch);
 }
 void ctrl_set_duty_max(uint8_t ch, float m)
 {
     param_set_max(duty, ch, m);
-    set_data_update();
+    set_data_update(ch);
 }
 float ctrl_get_duty_value(uint8_t ch) { return param_get_value(duty, ch); }
 float ctrl_get_duty_min(uint8_t ch) { return param_get_min(duty, ch); }
@@ -316,17 +316,17 @@ float ctrl_get_duty_max(uint8_t ch) { return param_get_max(duty, ch); }
 void ctrl_set_kp_value(uint8_t ch, float v)
 {
     param_set_value(kp, ch, v);
-    set_data_update();
+    set_data_update(ch);
 }
 void ctrl_set_kp_min(uint8_t ch, float m)
 {
     param_set_min(kp, ch, m);
-    set_data_update();
+    set_data_update(ch);
 }
 void ctrl_set_kp_max(uint8_t ch, float m)
 {
     param_set_max(kp, ch, m);
-    set_data_update();
+    set_data_update(ch);
 }
 float ctrl_get_kp_value(uint8_t ch) { return param_get_value(kp, ch); }
 float ctrl_get_kp_min(uint8_t ch) { return param_get_min(kp, ch); }
@@ -339,17 +339,17 @@ float ctrl_get_kp_max(uint8_t ch) { return param_get_max(kp, ch); }
 void ctrl_set_ki_value(uint8_t ch, float v)
 {
     param_set_value(ki, ch, v);
-    set_data_update();
+    set_data_update(ch);
 }
 void ctrl_set_ki_min(uint8_t ch, float m)
 {
     param_set_min(ki, ch, m);
-    set_data_update();
+    set_data_update(ch);
 }
 void ctrl_set_ki_max(uint8_t ch, float m)
 {
     param_set_max(ki, ch, m);
-    set_data_update();
+    set_data_update(ch);
 }
 float ctrl_get_ki_value(uint8_t ch) { return param_get_value(ki, ch); }
 float ctrl_get_ki_min(uint8_t ch) { return param_get_min(ki, ch); }
@@ -362,17 +362,17 @@ float ctrl_get_ki_max(uint8_t ch) { return param_get_max(ki, ch); }
 void ctrl_set_kd_value(uint8_t ch, float v)
 {
     param_set_value(kd, ch, v);
-    set_data_update();
+    set_data_update(ch);
 }
 void ctrl_set_kd_min(uint8_t ch, float m)
 {
     param_set_min(kd, ch, m);
-    set_data_update();
+    set_data_update(ch);
 }
 void ctrl_set_kd_max(uint8_t ch, float m)
 {
     param_set_max(kd, ch, m);
-    set_data_update();
+    set_data_update(ch);
 }
 float ctrl_get_kd_value(uint8_t ch) { return param_get_value(kd, ch); }
 float ctrl_get_kd_min(uint8_t ch) { return param_get_min(kd, ch); }
@@ -388,7 +388,7 @@ void ctrl_set_output_state(uint8_t ch, bool state)
     {
         output_state[ch] = state;
     }
-    set_data_update();
+    set_data_update(ch);
 }
 
 bool ctrl_get_output_state(uint8_t ch)
@@ -406,7 +406,7 @@ void ctrl_set_controller_type(uint8_t ch, ctrl_type_t t)
     {
         controller_type[ch] = t;
     }
-    set_data_update();
+    set_data_update(ch);
 }
 
 ctrl_type_t ctrl_get_controller_type(uint8_t ch)

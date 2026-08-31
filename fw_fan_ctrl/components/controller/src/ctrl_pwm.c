@@ -4,7 +4,7 @@
 // #include "nvs_flash.h"
 #include "esp_task_wdt.h"
 #include "driver/ledc.h"
-#include "driver/gpio.h" 
+#include "driver/gpio.h"
 #include "esp_err.h"
 
 #include "ctrl_pwm.h"
@@ -66,7 +66,7 @@ static uint32_t frac_acc[2] = {0, 0};
 // Ajusta PWM_CHANNEL1 y PWM_CHANNEL2 según tu definición (ej. LEDC_CHANNEL_0, LEDC_CHANNEL_1)
 static const int hw_channels[] = {PWM_CHANNEL1, PWM_CHANNEL2};
 
-void ctrl_pwm_update_duty(float duty, uint8_t channel)
+void ctrl_pwm_update_duty(uint8_t channel, float duty)
 {
     // Validaciones de seguridad
     if (channel >= 2)

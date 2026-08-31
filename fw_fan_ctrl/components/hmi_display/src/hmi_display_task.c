@@ -146,19 +146,19 @@ void ui_task(void *pvParameter)
         ui_update_value_speed(ctrl_get_filtred_speed(0));
         ui_update_value_duty(ctrl_get_duty_value(0));
 
-        if (ctrl_dilplay_data_get_update())
+        if (ctrl_dislplay_data_get_update(0))
         {
+            ui_update_value_point(ctrl_get_setpoint_value(0));
+            ui_update_value_kp(ctrl_get_kp_value(0));
+            ui_update_value_ki(ctrl_get_ki_value(0));
+            ui_update_value_kd(ctrl_get_kd_value(0));
+            ui_update_value_min(ctrl_get_duty_min(0));
+            ui_update_value_max(ctrl_get_duty_max(0));
+            ui_update_out_state(ctrl_get_output_state(0));
+            ui_update_ctrl_type(ctrl_get_controller_type(0));
+            ui_update_error_mark(tmc_scpi_has_errors());
+            ui_update_remote_mark(tmc_scpi_has_connected());
         }
-        ui_update_value_point(ctrl_get_setpoint_value(0));
-        ui_update_value_kp(ctrl_get_kp_value(0));
-        ui_update_value_ki(ctrl_get_ki_value(0));
-        ui_update_value_kd(ctrl_get_kd_value(0));
-        ui_update_value_min(ctrl_get_duty_min(0));
-        ui_update_value_max(ctrl_get_duty_max(0));
-        ui_update_out_state(ctrl_get_output_state(0));
-        ui_update_ctrl_type(ctrl_get_controller_type(0));
-        ui_update_error_mark(tmc_scpi_has_errors());
-        ui_update_remote_mark(tmc_scpi_has_connected());
         vTaskDelay(pdMS_TO_TICKS(50));
     }
 }

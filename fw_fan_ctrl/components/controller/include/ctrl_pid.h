@@ -27,7 +27,7 @@ extern "C"
     ctrl_pid_status_t ctrl_pid_update_coeff(uint8_t channel);
 
     void ctrl_pid_state_reset(uint8_t channel);
-    float dsp_pid_update(float error, float period_sec, uint8_t channel);
+    float dsp_pid_update(uint8_t channel, float error, float period_sec);
     float ctrl_get_pid_output(uint8_t channel);
 
 #ifdef __cplusplus

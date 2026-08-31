@@ -4,7 +4,7 @@
 #include "hmi_display.h"
 #include "usb_tmc_init.h"
 #include "usb_tmc_process.h"
-#include "ctrl_task.h"
+#include "ctrl_runtime.h"
 
 // 1. Definir el tamaño en BYTES
 #define DISPLAY_TASK_STACK_SIZE 8 * 1024

@@ -1,38 +1,37 @@
-#include "ctrl_sensor.h"
 #include "driver/mcpwm_cap.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "ctrl_data.h"
 #include "stdint.h"
 #include "stdbool.h"
 #include "math.h"
 #include "esp_log.h"
 #include "esp_err.h"
 #include "esp_timer.h"
+#include "ctrl_data.h"
+#include "ctrl_runtime.h"
+#include "ctrl_sensor.h"
 
-extern TaskHandle_t x_ctrl_TaskHandle;
+#define RPM_CONST_COEFICIENT (60.0f * (CTRL_SENSOR_TIMER_RES_HZ) / (CTRL_SENSOR_PPR))
+#define SENSOR_TIMER_TICKS_TO_US CTRL_SENSOR_TIMER_RES_HZ / 1000000UL
+#define CTRL_TASK_STACK_SIZE 4 * 1024
+#define TASK_SPEED_EVENT_TIMEOUT_MS 80
+#define MIN_SPEED_RPM_CUTOFF 6.0f
 
 const static char *TAG = "ctrl_capture";
 
-#define RPM_CONST_COEFICIENT 60.0f * CTRL_SENSOR_TIMER_RES_HZ / CTRL_SENSOR_PPR
-
 static capture_edges_t edge_history[CTRL_NUM_CHANNELS];
 static isr_to_task_data_t shared_data[CTRL_NUM_CHANNELS];
+// Estructura estatica de la interrupción de captura
 static mcpwm_cap_timer_handle_t cap_timer_handle = NULL;
 static portMUX_TYPE sensor_spinlock = portMUX_INITIALIZER_UNLOCKED;
 
-float filtred_speed[CTRL_NUM_CHANNELS];
+// Estructura de la tarea de actualización de la velocidad
+static StaticTask_t x_ctrl_sensor_event_TaskBuffer;
+static StackType_t x_ctrl_sensor_event_TaskStack[CTRL_TASK_STACK_SIZE];
+static TaskHandle_t x_ctrl_sensor_event_TaskHandle = NULL;
 
-bool ctrl_make_sample(float speed, uint64_t timestamp_us, ctrl_sensor_data_t *out)
-{
-    if (out)
-    {
-        out->speed = speed;
-        out->timestamp_us = timestamp_us;
-        return true;
-    }
-    return false;
-}
+static float filtred_speed[CTRL_NUM_CHANNELS] = {0.0f};
+static float current_speed[CTRL_NUM_CHANNELS] = {0.0f};
 
 static bool isr_captura(mcpwm_cap_channel_handle_t cap_chan, const mcpwm_capture_event_data_t *edata, void *user_data)
 {
@@ -41,7 +40,7 @@ static bool isr_captura(mcpwm_cap_channel_handle_t cap_chan, const mcpwm_capture
     uint32_t period = 0;
     BaseType_t xHigherPriorityTaskMayWake = pdFALSE;
 
-    taskENTER_CRITICAL_ISR(&sensor_spinlock);
+    portENTER_CRITICAL_ISR(&sensor_spinlock);
 
     period = last_event - edge_history[canal].last_edges[1];
 
@@ -50,25 +49,18 @@ static bool isr_captura(mcpwm_cap_channel_handle_t cap_chan, const mcpwm_capture
 
     shared_data[canal].period_ticks = period;
 
-    // Novedad: Guardamos el tiempo del sistema (64 bits reales, nunca desborda en la vida útil)
     shared_data[canal].timestamp_hw_us = esp_timer_get_time();
-    taskEXIT_CRITICAL_ISR(&sensor_spinlock);
+    portEXIT_CRITICAL_ISR(&sensor_spinlock);
 
-    if (x_ctrl_TaskHandle != NULL)
+    if (x_ctrl_sensor_event_TaskHandle != NULL)
     {
-        xTaskNotifyFromISR(x_ctrl_TaskHandle, (1 << canal), eSetBits, &xHigherPriorityTaskMayWake);
+        xTaskNotifyFromISR(x_ctrl_sensor_event_TaskHandle, (1 << canal), eSetBits, &xHigherPriorityTaskMayWake);
     }
 
     return xHigherPriorityTaskMayWake == pdTRUE;
 }
 
-static inline void send_speed(float speed, uint8_t channel)
-{
-    taskENTER_CRITICAL(&sensor_spinlock);
-    shared_data[channel].speed = speed;
-    taskEXIT_CRITICAL(&sensor_spinlock);
-}
-
+/* Filtrado de datos de velocidad (usado por la pantalla) */
 #define FILTER_ORDER 5
 float alpha, beta;
 float ema_speed[CTRL_NUM_CHANNELS][FILTER_ORDER];
@@ -82,52 +74,106 @@ static float get_alpha(void)
     return (float)alpha;
 }
 
+static inline void update_filtred_speed(uint8_t channel, float speed)
+{
+    float local_ema[FILTER_ORDER];
+
+    portENTER_CRITICAL(&sensor_spinlock);
+    for (uint8_t i = 0; i < FILTER_ORDER; i++)
+    {
+        local_ema[i] = ema_speed[channel][i];
+    }
+    portEXIT_CRITICAL(&sensor_spinlock);
+
+    local_ema[0] = alpha * local_ema[0] + beta * speed;
+    for (uint8_t i = 1; i < FILTER_ORDER; i++)
+    {
+        local_ema[i] = alpha * local_ema[i] + beta * local_ema[i - 1];
+    }
+
+    portENTER_CRITICAL(&sensor_spinlock);
+    for (uint8_t i = 0; i < FILTER_ORDER; i++)
+    {
+        ema_speed[channel][i] = local_ema[i];
+    }
+    filtred_speed[channel] = local_ema[FILTER_ORDER - 1];
+    portEXIT_CRITICAL(&sensor_spinlock);
+}
+
 // Esta funcion se llama desde la tarea de control periodica cuando es despertada por un evento de captura. Para no calcular la velocidad dentro de la ISR se calculara y guardara acá.
-void ctrl_asinc_update_speed(uint8_t channel)
+static void ctrl_asinc_update_speed(uint8_t channel)
+{
+    uint32_t period = 0;
+    uint64_t last_pulse_us = 0;
+    ctrl_buffer_data_t *buffer = ctrl_get_buffers(channel);
+    ctrl_sensor_data_t item;
+
+    portENTER_CRITICAL(&sensor_spinlock);
+    period = shared_data[channel].period_ticks;
+    last_pulse_us = shared_data[channel].timestamp_hw_us;
+    current_speed[channel] = RPM_CONST_COEFICIENT / (float)period;
+    portEXIT_CRITICAL(&sensor_spinlock);
+
+    ctrl_make_sample(current_speed[channel], last_pulse_us, &item);
+    update_filtred_speed(channel, current_speed[channel]);
+
+    // Se inyecta en el buffer el nuevo dato de la velocidad con su marca de tiempo
+    buffer->push(buffer, &item);
+}
+
+static float ctrl_get_bounded_speed(uint8_t channel)
 {
     uint32_t period = 0;
     uint64_t last_pulse_us = 0;
 
-    taskENTER_CRITICAL(&sensor_spinlock);
+    portENTER_CRITICAL(&sensor_spinlock);
     period = shared_data[channel].period_ticks;
     last_pulse_us = shared_data[channel].timestamp_hw_us;
-    taskEXIT_CRITICAL(&sensor_spinlock);
+    portEXIT_CRITICAL(&sensor_spinlock);
 
-    float speed = RPM_CONST_COEFICIENT / (float)period;
-    ctrl_buffer_data_t *buffer = ctrl_get_buffers(channel);
-    ctrl_sensor_data_t item;
-    ctrl_make_sample(speed, last_pulse_us, &item);
-    buffer->push(buffer, &item);
+    uint64_t time = esp_timer_get_time();
 
-    // Filtrado de la sseñal de velocidad para que la pantalla tenga un valor mas estable (legible).
-    // El filtro debe tener una frecuencia un corrimiento de fase mejopr a 0,4 segundos para que no sea apreciable por la persepcion del usuario
-    ema_speed[channel][0] = alpha * ema_speed[channel][0] + beta * speed;
-    for (uint8_t i = 1; i < FILTER_ORDER; i++)
+    // si todavia no pasaron 50ms usamos la velocidad media, si pasaron mas de 50ms recalculamos la cota superior de la velocidad
+    float bounded_speed;
+
+    if (time < (last_pulse_us + TASK_SPEED_EVENT_TIMEOUT_MS * 1000))
     {
-        ema_speed[channel][i] = alpha * ema_speed[channel][i - 1] + beta * ema_speed[channel][i];
+        bounded_speed = ctrl_get_filtred_speed(channel);
     }
-    filtred_speed[channel] = ema_speed[channel][FILTER_ORDER - 1];
+    else
+    {
+        uint64_t bounded_period = SENSOR_TIMER_TICKS_TO_US * (time - last_pulse_us) + period;
+        bounded_speed = RPM_CONST_COEFICIENT / (float)bounded_period;
+    }
+
+    // si la cota de velocidad  es menor a 6RPM se pone la velocidad a 0
+    if (bounded_speed < MIN_SPEED_RPM_CUTOFF)
+    {
+        bounded_speed = 0.0f;
+    }
+
+    update_filtred_speed(channel, bounded_speed);
+    return bounded_speed;
+}
+
+bool ctrl_make_sample(float speed, uint64_t timestamp_us, ctrl_sensor_data_t *out)
+{
+    if (out)
+    {
+        out->speed = speed;
+        out->timestamp_us = timestamp_us;
+        return true;
+    }
+    return false;
 }
 
 float ctrl_get_sensor_speed(uint8_t channel)
 {
-    if (channel >= CTRL_NUM_CHANNELS)
+    if (channel < CTRL_NUM_CHANNELS)
     {
-        return 0.0f;
+        return current_speed[channel];
     }
-    ctrl_buffer_data_t *buffer = ctrl_get_buffers(channel);
-    ctrl_sensor_data_t item;
-    buffer->get_latest(buffer, &item);
-
-    // Manejo de timeout usando el tiempo absoluto
-    uint64_t tiempo_actual_us = esp_timer_get_time();
-
-    // Ajusta CTRL_SENSOR_TIMEOUT_TICKS a su equivalente en microsegundos si es necesario
-    if ((tiempo_actual_us - item.timestamp_us) > CTRL_SENSOR_TIMEOUT_TICKS)
-    {
-        return 0.0f;
-    }
-    return item.speed;
+    return 0.0f;
 }
 
 float ctrl_get_filtred_speed(uint8_t channel)
@@ -135,49 +181,67 @@ float ctrl_get_filtred_speed(uint8_t channel)
     return filtred_speed[channel];
 }
 
-float ctrl_get_bounded_speed(uint8_t channel)
+static inline bool is_channel_in_timeout(uint8_t channel, uint64_t actual_time_us)
 {
-    uint32_t period = 0;
-    uint64_t ultimo_pulso_us = 0;
+    uint64_t last_pulse_us;
 
-    taskENTER_CRITICAL(&sensor_spinlock);
-    period = shared_data[channel].period_ticks;
-    ultimo_pulso_us = shared_data[channel].timestamp_hw_us;
-    taskEXIT_CRITICAL(&sensor_spinlock);
+    portENTER_CRITICAL(&sensor_spinlock);
+    last_pulse_us = shared_data[channel].timestamp_hw_us;
+    portEXIT_CRITICAL(&sensor_spinlock);
 
-    uint64_t time = esp_timer_get_time();
-    uint64_t bounded_period = 80 * (time - (ultimo_pulso_us)) + period;
-
-    float bounded_speed = (time < (ultimo_pulso_us + 500000)) ? ctrl_get_sensor_speed(channel) : RPM_CONST_COEFICIENT / (float)bounded_period;
-    if (bounded_speed < 6)
-    {
-        bounded_speed = 0.0f;
-    }
-    // Filtrado de la sseñal de velocidad para que la pantalla tenga un valor mas estable (legible).
-    // El filtro debe tener una frecuencia un corrimiento de fase mejopr a 0,4 segundos para que no sea apreciable por la persepcion del usuario
-    ema_speed[channel][0] = alpha * ema_speed[channel][0] + beta * bounded_speed;
-    for (uint8_t i = 1; i < FILTER_ORDER; i++)
-    {
-        ema_speed[channel][i] = alpha * ema_speed[channel][i - 1] + beta * ema_speed[channel][i];
-    }
-    filtred_speed[channel] = ema_speed[channel][FILTER_ORDER - 1];
-    return bounded_speed;
+    return ((actual_time_us - last_pulse_us) > (TASK_SPEED_EVENT_TIMEOUT_MS * 1000ULL));
 }
 
-float ctrl_get_last_period_seg(uint8_t channel)
+static inline uint32_t get_last_period(uint8_t channel)
 {
-    uint32_t period = 0;
-    uint64_t ultimo_pulso_us = 0;
-    uint64_t time = esp_timer_get_time();
+    uint32_t ticks0, ticks1;
+    portENTER_CRITICAL(&sensor_spinlock);
+    ticks0 = edge_history[channel].last_edges[0];
+    ticks1 = edge_history[channel].last_edges[1];
+    portEXIT_CRITICAL(&sensor_spinlock);
+    return ticks0 - ticks1;
+}
 
-    taskENTER_CRITICAL(&sensor_spinlock);
-    period = shared_data[channel].period_ticks;
-    ultimo_pulso_us = shared_data[channel].timestamp_hw_us;
-    taskEXIT_CRITICAL(&sensor_spinlock);
+void ctrl_sensor_event_task(void *vpParameter)
+{
+    uint32_t eventos_notificados = 0;
 
-    uint64_t bounded_period = 80 * (time - ultimo_pulso_us) + period;
+    while (1)
+    {
+        // El timeout se usa para revisar canales inactivos
+        BaseType_t xStatus = xTaskNotifyWait(0x00, 0xFFFFFFFF, &eventos_notificados, pdMS_TO_TICKS(TASK_SPEED_EVENT_TIMEOUT_MS));
+        uint64_t actual_time_us = esp_timer_get_time();
 
-    return ((float)bounded_period) / 8000000.0f;
+        for (uint8_t channel = 0; channel < CTRL_NUM_CHANNELS; channel++)
+        {
+            // 1. Revisar si ESTE canal generó el evento que despertó la tarea
+            if ((xStatus == pdTRUE) && (eventos_notificados & (1UL << channel)))
+            {
+                // Actualiza buffers y filtro
+                ctrl_asinc_update_speed(channel);
+
+                float last_time_interval = (float)(get_last_period(channel)) / (float)CTRL_SENSOR_TIMER_RES_HZ;
+
+                // TODO: llamar a la rutina de control para el canal con la velocidad real y el periodo
+                ctrl_fsm_runtime(channel, current_speed[channel], last_time_interval);
+            }
+            // 2. Si NO generó evento, se verifica el timeout del canal
+            else if (is_channel_in_timeout(channel, actual_time_us))
+            {
+                float velocidad_acotada = ctrl_get_bounded_speed(channel);
+                uint64_t last_pulse_us;
+
+                portENTER_CRITICAL(&sensor_spinlock);
+                last_pulse_us = shared_data[channel].timestamp_hw_us;
+                portEXIT_CRITICAL(&sensor_spinlock);
+
+                float last_time_interval = (float)(get_last_period(channel)) / (float)CTRL_SENSOR_TIMER_RES_HZ + (actual_time_us - last_pulse_us) / 1000000.0f;
+
+                // TODO: llamar a la rutina de control para el canal con la velocidad acotada
+                ctrl_fsm_runtime(channel, velocidad_acotada, last_time_interval);
+            }
+        }
+    }
 }
 
 void ctrl_sensor_init(void)
@@ -211,9 +275,15 @@ void ctrl_sensor_init(void)
     }
     ESP_ERROR_CHECK(mcpwm_capture_timer_enable(cap_timer_handle));
     ESP_ERROR_CHECK(mcpwm_capture_timer_start(cap_timer_handle));
-}
 
-isr_to_task_data_t *ctrl_get_sensor_data_handle(uint8_t channel)
-{
-    return &shared_data[channel];
+    x_ctrl_sensor_event_TaskHandle = xTaskCreateStaticPinnedToCore(
+        ctrl_sensor_event_task,          // Puntero a la función de la tarea
+        "Controller Task",               // Nombre (para depuración)
+        CTRL_TASK_STACK_SIZE,            // Tamaño de la pila
+        NULL,                            // Parámetro de entrada
+        10,                              // Prioridad
+        x_ctrl_sensor_event_TaskStack,   // Arreglo estático para la pila
+        &x_ctrl_sensor_event_TaskBuffer, // Estructura estática para el TCB
+        0                                // Anclado al Core 1 (APP_CPU)
+    );
 }
