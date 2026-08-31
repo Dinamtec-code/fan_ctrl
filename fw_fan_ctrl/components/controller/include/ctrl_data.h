@@ -4,6 +4,8 @@
 #include "stdint.h"
 #include "stdbool.h"
 
+#include "ctrl_sensor.h"
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -25,34 +27,29 @@ extern "C"
         float min;
     } ctrl_param_t;
 
-    // Estructura de un punto de dato completo
-    typedef struct
-    {
-        float speed;
-        uint64_t timestamp_us;
-    } ctrl_sensor_data_t;
+    typedef struct CTRL_BUFFER_DATA ctrl_buffer_data_t;
 
-    // Declaración adelantada (Forward declaration) para usarla en los punteros a función
-    typedef struct ctrl_buffer_data ctrl_buffer_data_t;
-
-    typedef struct ctrl_buffer_data
+    struct CTRL_BUFFER_DATA
     {
         ctrl_sensor_data_t *data;
-        size_t fifo_head;      // Donde escribimos
-        size_t fifo_tail;      // De donde leemos
-        size_t fifo_count;     // Elementos actuales en el buffer
-        portMUX_TYPE spinlock; // Spinlock independiente para este canal
+        size_t capacity;
+        size_t head;
+        size_t tail;
+        bool overflow_flag;
+        portMUX_TYPE spinlock;
 
-        // Métodos (reciben un puntero a sí mismos "self")
-        void (*push)(ctrl_buffer_data_t *self, float speed, uint64_t timestamp_us);
-        bool (*pop)(ctrl_buffer_data_t *self, ctrl_sensor_data_t *out_data);
-        bool (*get_latest)(ctrl_buffer_data_t *self, ctrl_sensor_data_t *out_data);
+        void (*push)(ctrl_buffer_data_t *self, const ctrl_sensor_data_t *in_item);
+        size_t (*pop_block)(ctrl_buffer_data_t *self, ctrl_sensor_data_t *out_array, size_t max);
+        size_t (*pop_all)(ctrl_buffer_data_t *self, ctrl_sensor_data_t *out_array);
+        bool (*get_latest)(ctrl_buffer_data_t *self, ctrl_sensor_data_t *out_item);
         size_t (*get_count)(ctrl_buffer_data_t *self);
-    } ctrl_buffer_data_t;
+        bool (*seek_tail)(ctrl_buffer_data_t *self, size_t offset_from_head);
+        bool (*check_and_clear_overflow)(ctrl_buffer_data_t *self);
+    };
 
-    // Exponemos un arreglo de manejadores, uno para cada canal
-    extern ctrl_buffer_data_t ctrl_sensor_buffers[CTRL_NUM_CHANNELS];
+    ctrl_buffer_data_t *ctrl_get_buffers(uint8_t channel);
 
+    void ctrl_buffer_data_init(void);
     bool ctrl_data_get_update(void);
     bool ctrl_dilplay_data_get_update(void);
 

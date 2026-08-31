@@ -20,14 +20,15 @@
 // --- Definición de Pines (Ajusta según tu placa) ---
 #define LCD_HOST SPI2_HOST
 #define LCD_PIXEL_CLK_HZ (20 * 1000 * 1000) // 40 MHz
-#define LCD_PIN_NUM_MISO -1
-#define LCD_PIN_NUM_BK_LIGHT 13
-#define LCD_PIN_NUM_CLK 12
-#define LCD_PIN_NUM_MOSI 11
-
-#define LCD_PIN_NUM_DC 14
-#define LCD_PIN_NUM_RST 9
-#define LCD_PIN_NUM_CS 10
+#define LCD_PIN_NUM_MISO -1                 // Display SDO      pin 9
+#define LCD_PIN_NUM_BK_LIGHT 14             // Display LED      pin 8
+#define LCD_PIN_NUM_CLK 13                  // Display SCK      pin 7
+#define LCD_PIN_NUM_MOSI 12                 // Display SDI      pin 6
+#define LCD_PIN_NUM_DC 11                   // Display DC       pin 5
+#define LCD_PIN_NUM_RST 10                  // Display RESET    pin 4
+#define LCD_PIN_NUM_CS 9                    // Display CS       pin 3
+                                            // Display GND      pin 2
+                                            // Display VCC      pin 1
 
 // 1. Definir el tamaño en BYTES (En ESP-IDF, el stack se mide en bytes, no en words)
 #define DISPLAY_TASK_STACK_SIZE 8 * 1024
@@ -135,34 +136,14 @@ void display_init(void)
     // esp_lvgl_port se encarga de ejecutar la tarea del handler de LVGL internamente.
     vTaskDelete(NULL);
 }
-uint32_t orden_filtro = 16;
-static float get_alpha()
-{
-    double fc = 1;
-    double fm = 50;
-    double correccion_cascada = sqrt(pow(2, ((1.0 / (double)orden_filtro) - 1.0)));
-    double alpha = 1.0 - exp(-2.0 * M_PI * (fc / fm) / correccion_cascada);
-    return (float)alpha;
-}
 
 void ui_task(void *pvParameter)
 {
-    float bounded_speed;
-    float alpha = get_alpha();
-    float beta = 1.0f - alpha;
-    float ema_speed[orden_filtro];
     vTaskDelay(pdMS_TO_TICKS(10));
     while (1)
     {
 
-        bounded_speed = ctrl_get_sensor_speed(0);
-        ema_speed[0] = alpha * ema_speed[0] + beta * bounded_speed;
-        for (uint8_t i = 1; i < orden_filtro; i++)
-        {
-            ema_speed[i] = alpha * ema_speed[i] + beta * ema_speed[i - 1];
-        }
-
-        ui_update_value_speed(ema_speed[7]);
+        ui_update_value_speed(ctrl_get_filtred_speed(0));
         ui_update_value_duty(ctrl_get_duty_value(0));
 
         if (ctrl_dilplay_data_get_update())

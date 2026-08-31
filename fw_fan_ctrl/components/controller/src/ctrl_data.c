@@ -1,5 +1,6 @@
 #include "ctrl_data.h"
 #include "ctrl_sensor.h"
+#include "ctrl_output.h"
 
 // Memoria estática para los datos
 static ctrl_sensor_data_t ctrl_sensor_data_buffer[CTRL_NUM_CHANNELS][SENSOR_BUFFER_SIZE];
@@ -8,69 +9,101 @@ static ctrl_sensor_data_t ctrl_sensor_data_buffer[CTRL_NUM_CHANNELS][SENSOR_BUFF
 /*                          MÉTODOS DEL BUFFER (OOP)                          */
 /* ========================================================================== */
 
-static void ctrl_data_buffer_push(ctrl_buffer_data_t *self, float speed, uint64_t timestamp_us)
+static void ctrl_data_buffer_push(ctrl_buffer_data_t *self, const ctrl_sensor_data_t *in_item)
 {
-    taskENTER_CRITICAL(&self->spinlock);
+    portENTER_CRITICAL(&self->spinlock);
 
-    self->data[self->fifo_head].speed = speed;
-    self->data[self->fifo_head].timestamp_us = timestamp_us;
+    self->data[self->head] = *in_item;
+    self->head = (self->head + 1) % self->capacity;
 
-    self->fifo_head = (self->fifo_head + 1) % SENSOR_BUFFER_SIZE;
-
-    if (self->fifo_count < SENSOR_BUFFER_SIZE)
+    if (self->head == self->tail)
     {
-        self->fifo_count++;
-    }
-    else
-    {
-        // El buffer está lleno, sobrescribimos el más viejo y avanzamos la cola
-        self->fifo_tail = (self->fifo_tail + 1) % SENSOR_BUFFER_SIZE;
+        // Lleno: se descarta el más viejo
+        self->tail = (self->tail + 1) % self->capacity;
+        self->overflow_flag = true;
     }
 
-    taskEXIT_CRITICAL(&self->spinlock);
+    portEXIT_CRITICAL(&self->spinlock);
 }
 
-static bool ctrl_data_buffer_pop(ctrl_buffer_data_t *self, ctrl_sensor_data_t *out_data)
+static size_t ctrl_data_buffer_pop_block(ctrl_buffer_data_t *self,
+                                         ctrl_sensor_data_t *out_array,
+                                         size_t max)
+{
+    portENTER_CRITICAL(&self->spinlock);
+
+    size_t avail = (self->head - self->tail + self->capacity) % self->capacity;
+    size_t n = (max < avail) ? max : avail;
+
+    for (size_t i = 0; i < n; i++)
+    {
+        out_array[i] = self->data[self->tail];
+        self->tail = (self->tail + 1) % self->capacity;
+    }
+
+    portEXIT_CRITICAL(&self->spinlock);
+    return n;
+}
+
+static inline size_t ctrl_data_buffer_pop_all(ctrl_buffer_data_t *self,
+                                              ctrl_sensor_data_t *out_array)
+{
+
+    return self->pop_block(self, out_array, self->capacity);
+}
+
+static bool ctrl_data_buffer_get_latest(ctrl_buffer_data_t *self,
+                                        ctrl_sensor_data_t *out_item)
 {
     bool has_data = false;
-    taskENTER_CRITICAL(&self->spinlock);
+    portENTER_CRITICAL(&self->spinlock);
 
-    if (self->fifo_count > 0)
+    if (self->head != self->tail)
     {
-        *out_data = self->data[self->fifo_tail];
-        self->fifo_tail = (self->fifo_tail + 1) % SENSOR_BUFFER_SIZE;
-        self->fifo_count--;
+        // El último dato escrito está una posición antes de head
+        size_t latest_idx = (self->head == 0) ? (self->capacity - 1) : (self->head - 1);
+        *out_item = self->data[latest_idx];
         has_data = true;
     }
 
-    taskEXIT_CRITICAL(&self->spinlock);
-    return has_data;
-}
-
-static bool ctrl_data_buffer_get_latest(ctrl_buffer_data_t *self, ctrl_sensor_data_t *out_data)
-{
-    bool has_data = false;
-    taskENTER_CRITICAL(&self->spinlock);
-
-    if (self->fifo_count > 0)
-    {
-        // El último dato escrito está una posición antes de fifo_head
-        size_t latest_idx = (self->fifo_head == 0) ? (SENSOR_BUFFER_SIZE - 1) : (self->fifo_head - 1);
-        *out_data = self->data[latest_idx];
-        has_data = true;
-    }
-
-    taskEXIT_CRITICAL(&self->spinlock);
+    portEXIT_CRITICAL(&self->spinlock);
     return has_data;
 }
 
 static size_t ctrl_data_buffer_get_count(ctrl_buffer_data_t *self)
 {
-    size_t count = 0;
-    taskENTER_CRITICAL(&self->spinlock);
-    count = self->fifo_count;
-    taskEXIT_CRITICAL(&self->spinlock);
+    portENTER_CRITICAL(&self->spinlock);
+    size_t count = (self->head - self->tail + self->capacity) % self->capacity;
+    portEXIT_CRITICAL(&self->spinlock);
     return count;
+}
+
+static bool ctrl_data_buffer_seek_tail(ctrl_buffer_data_t *self, size_t offset_from_head)
+{
+    portENTER_CRITICAL(&self->spinlock);
+
+    size_t occupancy = (self->head - self->tail + self->capacity) % self->capacity;
+
+    if (offset_from_head == 0 || offset_from_head > occupancy)
+    {
+        portEXIT_CRITICAL(&self->spinlock);
+        return false;
+    }
+
+    self->tail = (self->capacity + self->head - offset_from_head) % self->capacity;
+    self->overflow_flag = false;
+
+    portEXIT_CRITICAL(&self->spinlock);
+    return true;
+}
+
+static bool ctrl_data_buffer_check_and_clear_overflow(ctrl_buffer_data_t *self)
+{
+    portENTER_CRITICAL(&self->spinlock);
+    bool flag = self->overflow_flag;
+    self->overflow_flag = false;
+    portEXIT_CRITICAL(&self->spinlock);
+    return flag;
 }
 
 /* ========================================================================== */
@@ -78,29 +111,37 @@ static size_t ctrl_data_buffer_get_count(ctrl_buffer_data_t *self)
 /* ========================================================================== */
 
 // Creamos un arreglo de buffers para acceder fácilmente mediante el índice del canal
-ctrl_buffer_data_t ctrl_sensor_buffers[CTRL_NUM_CHANNELS] = {
-    [0] = {// primer canal
-           .data = &ctrl_sensor_data_buffer[0][0],
-           .fifo_head = 0,
-           .fifo_tail = 0,
-           .fifo_count = 0,
-           .spinlock = portMUX_INITIALIZER_UNLOCKED,
-           .push = ctrl_data_buffer_push,
-           .pop = ctrl_data_buffer_pop,
-           .get_latest = ctrl_data_buffer_get_latest,
-           .get_count = ctrl_data_buffer_get_count},
-    [1] = {// segundo canal
-           .data = &ctrl_sensor_data_buffer[1][0],
-           .fifo_head = 0,
-           .fifo_tail = 0,
-           .fifo_count = 0,
-           .spinlock = portMUX_INITIALIZER_UNLOCKED,
-           .push = ctrl_data_buffer_push,
-           .pop = ctrl_data_buffer_pop,
-           .get_latest = ctrl_data_buffer_get_latest,
-           .get_count = ctrl_data_buffer_get_count} // fin de la inicializacion
-};
+ctrl_buffer_data_t ctrl_sensor_buffers[CTRL_NUM_CHANNELS];
 
+void ctrl_buffer_data_init(void)
+{
+    for (uint8_t ch = 0; ch < CTRL_NUM_CHANNELS; ch++)
+    {
+        ctrl_sensor_buffers[ch].data = &ctrl_sensor_data_buffer[ch][0];
+        ctrl_sensor_buffers[ch].capacity = SENSOR_BUFFER_SIZE;
+        ctrl_sensor_buffers[ch].head = 0;
+        ctrl_sensor_buffers[ch].tail = 0;
+        ctrl_sensor_buffers[ch].overflow_flag = false;
+        portMUX_INITIALIZE(&ctrl_sensor_buffers[ch].spinlock);
+
+        ctrl_sensor_buffers[ch].push = ctrl_data_buffer_push;
+        ctrl_sensor_buffers[ch].pop_block = ctrl_data_buffer_pop_block;
+        ctrl_sensor_buffers[ch].pop_all = ctrl_data_buffer_pop_all;
+        ctrl_sensor_buffers[ch].get_latest = ctrl_data_buffer_get_latest;
+        ctrl_sensor_buffers[ch].get_count = ctrl_data_buffer_get_count;
+        ctrl_sensor_buffers[ch].seek_tail = ctrl_data_buffer_seek_tail;
+        ctrl_sensor_buffers[ch].check_and_clear_overflow = ctrl_data_buffer_check_and_clear_overflow;
+    }
+}
+
+ctrl_buffer_data_t *ctrl_get_buffers(uint8_t channel)
+{
+    if (channel >= CTRL_NUM_CHANNELS)
+    {
+        return NULL;
+    }
+    return &(ctrl_sensor_buffers[channel]);
+}
 /* --- Variables de estado y parámetros del controlador --- */
 
 static bool output_state[CTRL_NUM_CHANNELS] = {false, false};

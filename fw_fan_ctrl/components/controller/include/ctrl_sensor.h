@@ -27,8 +27,17 @@ extern "C"
         float speed;
     } isr_to_task_data_t;
 
+    typedef struct
+    {
+        float speed;
+        uint64_t timestamp_us;
+    } ctrl_sensor_data_t;
+
+    bool ctrl_make_sample(float speed, uint64_t timestamp_us, ctrl_sensor_data_t *out);
+
     void ctrl_asinc_update_speed(uint8_t channel);
     float ctrl_get_sensor_speed(uint8_t channel);
+    float ctrl_get_filtred_speed(uint8_t channel);
     float ctrl_get_bounded_speed(uint8_t channel);
     float ctrl_get_last_period_seg(uint8_t channel);
     isr_to_task_data_t *ctrl_get_sensor_data_handle(uint8_t channel);

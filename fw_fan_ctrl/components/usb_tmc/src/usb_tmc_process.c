@@ -21,8 +21,7 @@
 #include "usb_tmc_init.h"
 
 #include "ctrl_data.h"
-
-#include "ctrl_data.h"
+#include "ctrl_output.h"
 
 const static char *TAG = "tmc_fsm_task";
 
@@ -354,6 +353,7 @@ static scpi_result_t cmd_sour_outp(scpi_t *context)
     {
         return SCPI_RES_ERR;
     }
+    ctrl_output_state(channel - 1, (bool)on);
     ctrl_set_output_state((uint8_t)channel - 1, (bool)on);
 
     return SCPI_RES_OK;
@@ -484,9 +484,6 @@ static const scpi_command_t scpi_commands[] = {
     {.pattern = "SOURce#:CONTrol:PID:KI", .callback = cmd_pid_ki, .tag = 0},
     {.pattern = "SOURce#:CONTrol:PID:KD?", .callback = cmd_pid_kd_q, .tag = 0},
     {.pattern = "SOURce#:CONTrol:PID:KD", .callback = cmd_pid_kd, .tag = 0},
-    {.pattern = "SOURce#:CONTrol:PID:DUty?", .callback = cmd_pid_duty_q, .tag = 0},
-    {.pattern = "SOURce#:CONTrol:PID:TYPE?", .callback = cmd_pid_type_q, .tag = 0},
-    {.pattern = "SOURce#:CONTrol:PID:TYPE", .callback = cmd_pid_type, .tag = 0},
     {.pattern = "SOURce#:CONTrol:PID:DUty?", .callback = cmd_pid_duty_q, .tag = 0},
     {.pattern = "SOURce#:CONTrol:PID:TYPE?", .callback = cmd_pid_type_q, .tag = 0},
     {.pattern = "SOURce#:CONTrol:PID:TYPE", .callback = cmd_pid_type, .tag = 0},

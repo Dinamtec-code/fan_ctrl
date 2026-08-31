@@ -5,6 +5,7 @@
 #include "ctrl_data.h"
 #include "stdint.h"
 #include "stdbool.h"
+#include "math.h"
 #include "esp_log.h"
 #include "esp_err.h"
 #include "esp_timer.h"
@@ -19,6 +20,19 @@ static capture_edges_t edge_history[CTRL_NUM_CHANNELS];
 static isr_to_task_data_t shared_data[CTRL_NUM_CHANNELS];
 static mcpwm_cap_timer_handle_t cap_timer_handle = NULL;
 static portMUX_TYPE sensor_spinlock = portMUX_INITIALIZER_UNLOCKED;
+
+float filtred_speed[CTRL_NUM_CHANNELS];
+
+bool ctrl_make_sample(float speed, uint64_t timestamp_us, ctrl_sensor_data_t *out)
+{
+    if (out)
+    {
+        out->speed = speed;
+        out->timestamp_us = timestamp_us;
+        return true;
+    }
+    return false;
+}
 
 static bool isr_captura(mcpwm_cap_channel_handle_t cap_chan, const mcpwm_capture_event_data_t *edata, void *user_data)
 {
@@ -55,20 +69,44 @@ static inline void send_speed(float speed, uint8_t channel)
     taskEXIT_CRITICAL(&sensor_spinlock);
 }
 
+#define FILTER_ORDER 5
+float alpha, beta;
+float ema_speed[CTRL_NUM_CHANNELS][FILTER_ORDER];
+
+static float get_alpha(void)
+{
+    double fc = 4;
+    double fm = 40;
+    double correccion_cascada = sqrt(pow(2, 1.0 / (double)FILTER_ORDER) - 1.0);
+    double alpha = 1.0 - exp(-2.0 * M_PI * (fc / fm) / correccion_cascada);
+    return (float)alpha;
+}
+
 // Esta funcion se llama desde la tarea de control periodica cuando es despertada por un evento de captura. Para no calcular la velocidad dentro de la ISR se calculara y guardara acá.
 void ctrl_asinc_update_speed(uint8_t channel)
 {
     uint32_t period = 0;
-    uint64_t ultimo_pulso_us = 0;
+    uint64_t last_pulse_us = 0;
 
     taskENTER_CRITICAL(&sensor_spinlock);
     period = shared_data[channel].period_ticks;
-    ultimo_pulso_us = shared_data[channel].timestamp_hw_us;
+    last_pulse_us = shared_data[channel].timestamp_hw_us;
     taskEXIT_CRITICAL(&sensor_spinlock);
 
     float speed = RPM_CONST_COEFICIENT / (float)period;
-    ctrl_buffer_data_t *buffer = &ctrl_sensor_buffers[channel];
-    buffer->push(buffer, speed, shared_data[channel].timestamp_hw_us);
+    ctrl_buffer_data_t *buffer = ctrl_get_buffers(channel);
+    ctrl_sensor_data_t item;
+    ctrl_make_sample(speed, last_pulse_us, &item);
+    buffer->push(buffer, &item);
+
+    // Filtrado de la sseñal de velocidad para que la pantalla tenga un valor mas estable (legible).
+    // El filtro debe tener una frecuencia un corrimiento de fase mejopr a 0,4 segundos para que no sea apreciable por la persepcion del usuario
+    ema_speed[channel][0] = alpha * ema_speed[channel][0] + beta * speed;
+    for (uint8_t i = 1; i < FILTER_ORDER; i++)
+    {
+        ema_speed[channel][i] = alpha * ema_speed[channel][i - 1] + beta * ema_speed[channel][i];
+    }
+    filtred_speed[channel] = ema_speed[channel][FILTER_ORDER - 1];
 }
 
 float ctrl_get_sensor_speed(uint8_t channel)
@@ -77,20 +115,24 @@ float ctrl_get_sensor_speed(uint8_t channel)
     {
         return 0.0f;
     }
-    ctrl_buffer_data_t *buffer = &ctrl_sensor_buffers[channel];
-    ctrl_sensor_data_t data;
-    buffer->get_latest(buffer, &data);
+    ctrl_buffer_data_t *buffer = ctrl_get_buffers(channel);
+    ctrl_sensor_data_t item;
+    buffer->get_latest(buffer, &item);
 
     // Manejo de timeout usando el tiempo absoluto
     uint64_t tiempo_actual_us = esp_timer_get_time();
 
     // Ajusta CTRL_SENSOR_TIMEOUT_TICKS a su equivalente en microsegundos si es necesario
-    if ((tiempo_actual_us - data.timestamp_us) > CTRL_SENSOR_TIMEOUT_TICKS)
+    if ((tiempo_actual_us - item.timestamp_us) > CTRL_SENSOR_TIMEOUT_TICKS)
     {
         return 0.0f;
     }
+    return item.speed;
+}
 
-    return data.speed;
+float ctrl_get_filtred_speed(uint8_t channel)
+{
+    return filtred_speed[channel];
 }
 
 float ctrl_get_bounded_speed(uint8_t channel)
@@ -111,6 +153,14 @@ float ctrl_get_bounded_speed(uint8_t channel)
     {
         bounded_speed = 0.0f;
     }
+    // Filtrado de la sseñal de velocidad para que la pantalla tenga un valor mas estable (legible).
+    // El filtro debe tener una frecuencia un corrimiento de fase mejopr a 0,4 segundos para que no sea apreciable por la persepcion del usuario
+    ema_speed[channel][0] = alpha * ema_speed[channel][0] + beta * bounded_speed;
+    for (uint8_t i = 1; i < FILTER_ORDER; i++)
+    {
+        ema_speed[channel][i] = alpha * ema_speed[channel][i - 1] + beta * ema_speed[channel][i];
+    }
+    filtred_speed[channel] = ema_speed[channel][FILTER_ORDER - 1];
     return bounded_speed;
 }
 
@@ -132,6 +182,8 @@ float ctrl_get_last_period_seg(uint8_t channel)
 
 void ctrl_sensor_init(void)
 {
+    alpha = get_alpha();
+    beta = 1.0f - alpha;
     ESP_LOGW(TAG, "Periferico inicializado");
     mcpwm_capture_timer_config_t cap_conf = {
         .clk_src = MCPWM_CAPTURE_CLK_SRC_DEFAULT,
@@ -142,7 +194,7 @@ void ctrl_sensor_init(void)
     for (int i = 0; i < CTRL_NUM_CHANNELS; i++)
     {
         mcpwm_capture_channel_config_t chan_conf = {
-            .gpio_num = 40 + i,
+            .gpio_num = 1 + i,
             .prescale = 1,
             .flags.neg_edge = true,
             .flags.pos_edge = true};

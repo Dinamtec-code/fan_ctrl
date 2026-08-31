@@ -4,7 +4,7 @@
 // #include "nvs_flash.h"
 #include "esp_task_wdt.h"
 #include "driver/ledc.h"
-#include "driver/gpio.h" // Necesario en v6.0 para gpio_num_t
+#include "driver/gpio.h" 
 #include "esp_err.h"
 
 #include "ctrl_pwm.h"
@@ -13,8 +13,8 @@
 // Definiciones para el modulo LEDC (PWM)
 #define PWM_TIMER LEDC_TIMER_0
 #define PWM_MODE LEDC_LOW_SPEED_MODE // OBLIGATORIO en ESP32-S3
-#define PWM_OUTPUT_IO1 (35)
-#define PWM_OUTPUT_IO2 (36)
+#define PWM_OUTPUT_IO1 (41)
+#define PWM_OUTPUT_IO2 (38)
 #define PWM_CHANNEL1 LEDC_CHANNEL_0
 #define PWM_CHANNEL2 LEDC_CHANNEL_1
 #define PWM_DUTY_RES LEDC_TIMER_11_BIT

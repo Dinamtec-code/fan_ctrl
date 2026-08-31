@@ -6,6 +6,7 @@
 #include "ctrl_pwm.h"
 #include "ctrl_sensor.h"
 #include "ctrl_task.h"
+#include "ctrl_output.h"
 
 const static char *TAG_CTRL = "ctrl_task";
 
@@ -18,12 +19,13 @@ StaticTask_t x_ctrl_TaskBuffer;
 StackType_t x_ctrl_TaskStack[CTRL_TASK_STACK_SIZE];
 TaskHandle_t x_ctrl_TaskHandle = NULL;
 
-static void control_runtime(uint8_t channel, float speed)
+static inline void control_runtime(uint8_t channel, float speed)
 {
     switch (ctrl_get_controller_type(channel))
     {
     case CTRL_OPEN:
         // Refresco periódico del PWM en lazo abierto
+        // ESP_LOGI(TAG_CTRL, "speed: %8f \t OPEN", speed);
         ctrl_pwm_update_duty(ctrl_get_setpoint_value(channel), channel);
         break;
 
@@ -49,11 +51,17 @@ static void control_runtime(uint8_t channel, float speed)
             ctrl_pwm_update_duty(pwm, channel);
         }
         break;
+    default:
+        // ESP_LOGI(TAG_CTRL, "ctrl_get_controller_type(channel) desconocido");
     }
 }
 
 void ctrl_init(void)
 {
+    ctrl_buffer_data_init();
+    ctrl_output_init();
+    pwm_init();
+    ctrl_sensor_init();
     x_ctrl_TaskHandle = xTaskCreateStaticPinnedToCore(
         ctrl_task,            // Puntero a la función de la tarea
         "Controller Task",    // Nombre (para depuración)
@@ -64,8 +72,6 @@ void ctrl_init(void)
         &x_ctrl_TaskBuffer,   // Estructura estática para el TCB
         0                     // Anclado al Core 1 (APP_CPU)
     );
-    pwm_init();
-    ctrl_sensor_init();
 }
 
 void ctrl_task(void *vpParameter)
@@ -75,7 +81,7 @@ void ctrl_task(void *vpParameter)
     while (1)
     {
         // Bloquea la tarea hasta recibir notificación o timeout.
-        BaseType_t xStatus = xTaskNotifyWait(0x00, 0xFFFFFFFF, &eventos_notificados, pdMS_TO_TICKS(100));
+        BaseType_t xStatus = xTaskNotifyWait(0x00, 0xFFFFFFFF, &eventos_notificados, pdMS_TO_TICKS(50));
 
         if (xStatus == pdTRUE)
         {
@@ -95,13 +101,22 @@ void ctrl_task(void *vpParameter)
                 ctrl_asinc_update_speed(i);
                 // obtener velocidad para el controlador
                 float speed_rpm = ctrl_get_sensor_speed(i);
+                ESP_LOGI(TAG_CTRL, "speed: %8f \t channel: %2d \t state: %d", speed_rpm, i, ctrl_get_output_state(i));
 
                 // Verificaciones de seguridad
-                if (i < CTRL_NUM_CHANNELS && ctrl_get_output_state(i))
+                if (i < CTRL_NUM_CHANNELS)
                 {
-                    // 3. Ejecutar algoritmo de control
-                    control_runtime(i, speed_rpm);
-                    ESP_LOGI(TAG_CTRL, "speed: %8f", speed_rpm);
+                    if (ctrl_get_output_state(i))
+                    {
+                        // 3. Ejecutar algoritmo de control
+                        ctrl_output_state(i, true);
+                        control_runtime(i, speed_rpm);
+                    }
+                    else
+                    {
+                        ctrl_pid_state_reset(i);
+                        ctrl_output_state(i, false);
+                    }
                 }
             }
         }
@@ -112,11 +127,16 @@ void ctrl_task(void *vpParameter)
             float speed_rpm;
             for (uint8_t i = 0; i < CTRL_NUM_CHANNELS; i++)
             {
-                if (!ctrl_get_output_state(i))
+                if (ctrl_get_output_state(i))
                 {
+                    ctrl_output_state(i, true);
                     speed_rpm = ctrl_get_bounded_speed(i);
                     control_runtime(i, speed_rpm);
                     continue;
+                }
+                else
+                {
+                    ctrl_output_state(i, false);
                 }
             }
         }
