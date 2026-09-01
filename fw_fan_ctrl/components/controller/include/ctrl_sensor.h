@@ -32,7 +32,7 @@ extern "C"
         uint64_t timestamp_us;
     } ctrl_sensor_data_t;
 
-    bool ctrl_make_sample(float speed, uint64_t timestamp_us, ctrl_sensor_data_t *out);
+    // bool ctrl_make_sample(float speed, uint64_t timestamp_us, ctrl_sensor_data_t *out);
 
     float ctrl_get_sensor_speed(uint8_t channel);
     float ctrl_get_filtred_speed(uint8_t channel);

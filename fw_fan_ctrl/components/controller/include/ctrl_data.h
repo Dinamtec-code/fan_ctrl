@@ -51,7 +51,7 @@ extern "C"
 
     void ctrl_buffer_data_init(void);
     bool ctrl_data_get_update(uint8_t channel);
-    bool ctrl_dislplay_data_get_update(uint8_t channel);
+    bool ctrl_display_data_get_update(uint8_t channel);
 
     /* --- SET_POINT --- */
     void ctrl_set_setpoint_value(uint8_t channel, float value);

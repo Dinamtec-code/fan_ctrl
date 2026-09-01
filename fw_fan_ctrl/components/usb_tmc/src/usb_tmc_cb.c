@@ -11,7 +11,6 @@
 #include "usb_tmc_process.h"
 
 static const char *TAG_TMC = "usb_tmc_cb";
-static volatile uint8_t status;
 bool usb_host_connected = false;
 
 // 1. Implementación de Capabilities (Requerido)
@@ -127,9 +126,11 @@ bool tud_usbtmc_msgBulkIn_complete_cb(void)
 // 7. Callback para el STATUS BYTE (IEEE 488) - CRITICO PARA SCPI
 uint8_t tud_usbtmc_get_stb_cb(uint8_t *tmcResult)
 {
-    ESP_LOGI(TAG_TMC, "Get Status Byte ");
+    ESP_LOGI(TAG_TMC, "Get Status Byte");
+
     *tmcResult = USBTMC_STATUS_SUCCESS;
-    return (uint8_t)(usb_tmc_get_stb() & STB_ESB_BIT);
+
+    return usb_tmc_get_stb();
 }
 
 // 8. Callback para el TRIGGER (Ejemplo: comando *TRG o señal GET)
@@ -195,7 +196,7 @@ bool tud_usbtmc_check_abort_bulk_in_cb(usbtmc_check_abort_bulk_rsp_t *rsp)
 bool tud_usbtmc_initiate_clear_cb(uint8_t *tmcResult)
 {
     ESP_LOGI(TAG_TMC, "Init clear");
-    *tmcResult = USBTMC_STATUS_SUCCESS; 
+    *tmcResult = USBTMC_STATUS_SUCCESS;
     return true;
 }
 

@@ -12,26 +12,38 @@ const static char *TAG_CTRL = "ctrl_task";
 
 void ctrl_fsm_runtime(uint8_t channel, float speed, float period_sec)
 {
+    // Si hay una marca de que los datos del control se actualizaron
+    if (ctrl_data_get_update(channel))
+    {
+        ctrl_pid_update_coeff(channel);
+    }
     switch (ctrl_get_controller_type(channel))
     {
     case CTRL_OPEN:
         // Refresco periódico del PWM en lazo abierto
         // ESP_LOGI(TAG_CTRL, "speed: %8f \t OPEN", speed);
-        ctrl_pwm_update_duty(channel, ctrl_get_setpoint_value(channel));
+        if (ctrl_get_output_state(channel))
+        {
+            ctrl_pwm_update_duty(channel, ctrl_get_setpoint_value(channel));
+        }
+        else
+        {
+            ctrl_pwm_update_duty(channel, 0.0f);
+        }
         break;
 
     case CTRL_PID:
-        // Si hay una marca de que los datos del control se actualizaron
-        if (ctrl_data_get_update(channel))
+        if (ctrl_get_output_state(channel))
         {
-            ctrl_pid_update_coeff(channel);
+            float error = ctrl_get_setpoint_value(channel) - speed;
+            float pwm = dsp_pid_update(channel, error, period_sec);
+            ctrl_pwm_update_duty(channel, pwm);
         }
-
-        float error = ctrl_get_setpoint_value(channel) - speed;
-        float pwm = dsp_pid_update(channel, error, period_sec);
-
-        ctrl_pwm_update_duty(channel, pwm);
-
+        else
+        {
+            ctrl_pwm_update_duty(channel, 0.0f);
+            ctrl_pid_state_reset(channel);
+        }
         break;
     default:
         // ESP_LOGI(TAG_CTRL, "ctrl_get_controller_type(channel) desconocido");

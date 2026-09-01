@@ -45,8 +45,8 @@ static size_t ctrl_data_buffer_pop_block(ctrl_buffer_data_t *self,
     return n;
 }
 
-static inline size_t ctrl_data_buffer_pop_all(ctrl_buffer_data_t *self,
-                                              ctrl_sensor_data_t *out_array)
+static size_t ctrl_data_buffer_pop_all(ctrl_buffer_data_t *self,
+                                       ctrl_sensor_data_t *out_array)
 {
 
     return self->pop_block(self, out_array, self->capacity);
@@ -178,7 +178,7 @@ bool ctrl_data_get_update(uint8_t channel)
     return data;
 }
 
-bool ctrl_dislplay_data_get_update(uint8_t channel)
+bool ctrl_display_data_get_update(uint8_t channel)
 {
     bool data = display_data_update[channel];
     display_data_update[channel] = false;

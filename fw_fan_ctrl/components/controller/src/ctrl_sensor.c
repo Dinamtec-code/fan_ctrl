@@ -60,10 +60,21 @@ static bool isr_captura(mcpwm_cap_channel_handle_t cap_chan, const mcpwm_capture
     return xHigherPriorityTaskMayWake == pdTRUE;
 }
 
+static bool ctrl_make_sample(float speed, uint64_t timestamp_us, ctrl_sensor_data_t *out)
+{
+    if (out)
+    {
+        out->speed = speed;
+        out->timestamp_us = timestamp_us;
+        return true;
+    }
+    return false;
+}
+
 /* Filtrado de datos de velocidad (usado por la pantalla) */
 #define FILTER_ORDER 5
-float alpha, beta;
-float ema_speed[CTRL_NUM_CHANNELS][FILTER_ORDER];
+static float alpha, beta;
+static float ema_speed[CTRL_NUM_CHANNELS][FILTER_ORDER];
 
 static float get_alpha(void)
 {
@@ -154,17 +165,6 @@ static float ctrl_get_bounded_speed(uint8_t channel)
 
     update_filtred_speed(channel, bounded_speed);
     return bounded_speed;
-}
-
-bool ctrl_make_sample(float speed, uint64_t timestamp_us, ctrl_sensor_data_t *out)
-{
-    if (out)
-    {
-        out->speed = speed;
-        out->timestamp_us = timestamp_us;
-        return true;
-    }
-    return false;
 }
 
 float ctrl_get_sensor_speed(uint8_t channel)

@@ -48,7 +48,8 @@ extern "C"
     bool tmc_scpi_has_connected(void);
     void scpi_engine_init(void);
     void usb_tmc_fsm_process(usb_tmc_event_t event, void *data, size_t len);
-    usb_tmc_status_t usb_tmc_get_stb(void);
+    //usb_tmc_status_t usb_tmc_get_stb(void);
+    uint8_t usb_tmc_get_stb(void);
 
 #ifdef __cplusplus
 }

@@ -452,26 +452,11 @@ static const scpi_command_t scpi_commands[] = {
         .pattern = "SYSTem:VERSion?",
         .callback = SCPI_SystemVersionQ,
     },
-    {
-        .pattern = "STATus:OPERation?",
-        .callback = SCPI_StatusOperationEventQ,
-    },
-    {
-        .pattern = "STATus:OPERation:EVENt?",
-        .callback = SCPI_StatusOperationEventQ,
-    },
-    {
-        .pattern = "STATus:OPERation:CONDition?",
-        .callback = SCPI_StatusOperationConditionQ,
-    },
-    {
-        .pattern = "STATus:OPERation:ENABle",
-        .callback = SCPI_StatusOperationEnable,
-    },
-    {
-        .pattern = "STATus:OPERation:ENABle?",
-        .callback = SCPI_StatusOperationEnableQ,
-    },
+    /* {.pattern = "STATus:OPERation?", .callback = scpi_stub_callback,}, */
+    /* {.pattern = "STATus:OPERation:EVENt?", .callback = scpi_stub_callback,}, */
+    /* {.pattern = "STATus:OPERation:CONDition?", .callback = scpi_stub_callback,}, */
+    /* {.pattern = "STATus:OPERation:ENABle", .callback = scpi_stub_callback,}, */
+    /* {.pattern = "STATus:OPERation:ENABle?", .callback = scpi_stub_callback,}, */
     {
         .pattern = "STATus:QUEStionable[:EVENt]?",
         .callback = SCPI_StatusQuestionableEventQ,
@@ -515,14 +500,9 @@ static const scpi_command_t scpi_commands[] = {
 /* ==========================================================================
  * Callbacks de la interfaz de libscpi
  * ========================================================================== */
-// usb_tmc_status_t usb_tmc_get_stb(void)
-// {
-//     return usb_tmc_status_reg;
-// }
-
-uint8_t usb_tmc_get_stb(void)
+usb_tmc_status_t usb_tmc_get_stb(void)
 {
-    return (uint8_t)SCPI_RegGet(&scpi_context, SCPI_REG_STB);
+    return usb_tmc_status_reg;
 }
 
 static scpi_result_t my_CoreRst(scpi_t *context)
@@ -650,7 +630,6 @@ void usb_tmc_fsm_process(usb_tmc_event_t event, void *data, size_t len)
             if (data_2_tx > 0)
             {
                 tmc_state = STATE_TMC_REPLY_READY;
-                SCPI_RegSetBits(&scpi_context, SCPI_REG_STB, STB_MAV); // ya hay daatos para ser enviados
             }
             else
             {
@@ -679,7 +658,7 @@ void usb_tmc_fsm_process(usb_tmc_event_t event, void *data, size_t len)
         else if (event == EV_TMC_TX_DONE)
         {
             clear_tx_buffer();
-            SCPI_RegClearBits(&scpi_context, SCPI_REG_STB, STB_MAV); // ¡MAV se apaga al terminar!
+            usb_tmc_status_reg &= ~STB_MAV_BIT; // ¡MAV se apaga al terminar!
             tmc_state = STATE_TMC_IDLE;
             ESP_LOGI(TAG, "Respuesta enviada");
         }

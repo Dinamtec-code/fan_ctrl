@@ -142,11 +142,10 @@ void ui_task(void *pvParameter)
     vTaskDelay(pdMS_TO_TICKS(10));
     while (1)
     {
-
         ui_update_value_speed(ctrl_get_filtred_speed(0));
         ui_update_value_duty(ctrl_get_duty_value(0));
 
-        if (ctrl_dislplay_data_get_update(0))
+        if (ctrl_display_data_get_update(0))
         {
             ui_update_value_point(ctrl_get_setpoint_value(0));
             ui_update_value_kp(ctrl_get_kp_value(0));
