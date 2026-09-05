@@ -8,5 +8,5 @@ idf_component_register(
     "src/ctrl_output.c"
 
     INCLUDE_DIRS "include"
-    REQUIRES freertos driver esp_driver_mcpwm log esp-dsp esp_driver_ledc esp_driver_gpio esp_timer
+    REQUIRES freertos driver esp_driver_mcpwm log esp-dsp esp_driver_ledc esp_driver_gpio esp_timer adquisition
 )

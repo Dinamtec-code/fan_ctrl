@@ -16,8 +16,8 @@ lv_obj_t *label_min_d_value;
 lv_obj_t *label_max_d_value;
 lv_obj_t *label_out_state;
 lv_obj_t *label_controller_type;
-lv_obj_t *label_encoder_type;
-lv_obj_t *label_encoder_resolution;
+lv_obj_t *label_trigger_type;
+lv_obj_t *label_adq_state;
 lv_obj_t *label_com_iface;
 lv_obj_t *label_remote_state;
 lv_obj_t *label_error_state;
@@ -83,7 +83,8 @@ void ui_init(void)
     /**************************************************************************
      * SECCIÓN 2: BARRA INFERIOR DE ESTADO
      **************************************************************************/
-    const char *status_items[] = {"PID", "QUAD", "2ppr", "USB", "", ""};
+
+    const char *status_items[] = {"PID", "SetP", "STOP", "USB", "", ""};
     int box_w = 40;
     int box_h = 16;
     int spacing = (320 - (6 * box_w)) / 7;
@@ -97,8 +98,8 @@ void ui_init(void)
     // Usamos un arreglo de punteros a tus variables globales para actualizarlas directamente
     lv_obj_t **lbl_state_bar_refs[] = {
         &label_controller_type,
-        &label_encoder_type,
-        &label_encoder_resolution,
+        &label_trigger_type,
+        &label_adq_state,
         &label_com_iface,
         &label_remote_state,
         &label_error_state};
@@ -290,11 +291,6 @@ static char buf_kd[7];
 static char buf_sp[7];
 static char buf_lim_min[7];
 static char buf_lim_max[7];
-static const char out_state_on[] = "OUT: ON";
-static const char out_state_off[] = "OUT: OFF";
-static const char bar_state_err[] = "ERR";
-static const char bar_state_rem[] = "REM";
-static const char str_empty[] = "";
 
 // static const char units_rad_seg[] = "1/s";
 // static const char units_rpm[] = "RPM";
@@ -381,6 +377,9 @@ void ui_update_value_max(float max)
     }
 }
 
+/**
+ * Actualización del estado de salida
+ */
 void ui_update_out_state(bool state)
 {
     if (state)
@@ -388,7 +387,7 @@ void ui_update_out_state(bool state)
 
         if (lvgl_port_lock(0))
         {
-            lv_label_set_text_static(label_out_state, out_state_on);
+            lv_label_set_text_static(label_out_state, "OUT: ON");
             lv_obj_set_style_text_color(label_out_state, COLOR_RED_OUT_ON, 0);
             lvgl_port_unlock();
         }
@@ -398,13 +397,16 @@ void ui_update_out_state(bool state)
 
         if (lvgl_port_lock(0))
         {
-            lv_label_set_text_static(label_out_state, out_state_off);
+            lv_label_set_text_static(label_out_state, "OUT: OFF");
             lv_obj_set_style_text_color(label_out_state, COLOR_GREEN_OUT_OFF, 0);
             lvgl_port_unlock();
         }
     }
 }
 
+/**
+ * Actualización del tipo de controlador
+ */
 void ui_update_ctrl_type(ctrl_type_t type)
 {
     if (type == CTRL_OPEN)
@@ -425,6 +427,82 @@ void ui_update_ctrl_type(ctrl_type_t type)
     }
 }
 
+/**
+ * Actualización del estado de adquicisión
+ */
+void ui_update_adq_state(adq_state_t state)
+{
+    switch (state)
+    {
+    case ADQ_STATE_STOPPED:
+        if (lvgl_port_lock(0))
+        {
+            lv_label_set_text_static(label_adq_state, "STOP");
+            lvgl_port_unlock();
+        }
+        break;
+    case ADQ_STATE_WAITING:
+        if (lvgl_port_lock(0))
+        {
+            lv_label_set_text_static(label_adq_state, "WAIT");
+            lvgl_port_unlock();
+        }
+        break;
+    case ADQ_STATE_RUNNING:
+        if (lvgl_port_lock(0))
+        {
+            lv_label_set_text_static(label_adq_state, "RUN");
+            lvgl_port_unlock();
+        }
+        break;
+    default:
+        return;
+    }
+}
+
+/**
+ * Actualización del estado de adquicisión
+ */
+void ui_update_adq_trigger_source(adq_trigger_source_t source)
+{
+    switch (source)
+    {
+    case ADQ_TRIGGER_SETPOIT:
+        if (lvgl_port_lock(0))
+        {
+            lv_label_set_text_static(label_trigger_type, "SetP");
+            lvgl_port_unlock();
+        }
+        break;
+    case ADQ_TRIGGER_OUTPUT_ON:
+        if (lvgl_port_lock(0))
+        {
+            lv_label_set_text_static(label_trigger_type, "OutP");
+            lvgl_port_unlock();
+        }
+        break;
+    case ADQ_TRIGGER_EXTERNAL:
+        if (lvgl_port_lock(0))
+        {
+            lv_label_set_text_static(label_trigger_type, "Ext");
+            lvgl_port_unlock();
+        }
+        break;
+    case ADQ_TRIGGER_SOFTWARE:
+        if (lvgl_port_lock(0))
+        {
+            lv_label_set_text_static(label_trigger_type, "Soft");
+            lvgl_port_unlock();
+        }
+        break;
+    default:
+        return;
+    }
+}
+
+/**
+ * Actualización del controlador de errores
+ */
 void ui_update_error_mark(bool state)
 {
 
@@ -432,7 +510,7 @@ void ui_update_error_mark(bool state)
     {
         if (lvgl_port_lock(0))
         {
-            lv_label_set_text_static(label_error_state, bar_state_err);
+            lv_label_set_text_static(label_error_state, "ERR");
             lvgl_port_unlock();
         }
     }
@@ -440,19 +518,22 @@ void ui_update_error_mark(bool state)
     {
         if (lvgl_port_lock(0))
         {
-            lv_label_set_text_static(label_error_state, str_empty);
+            lv_label_set_text_static(label_error_state, "");
             lvgl_port_unlock();
         }
     }
 }
 
+/**
+ * Actualización de la interfaz remota
+ */
 void ui_update_remote_mark(bool state)
 {
     if (state)
     {
         if (lvgl_port_lock(0))
         {
-            lv_label_set_text_static(label_remote_state, bar_state_rem);
+            lv_label_set_text_static(label_remote_state, "REM");
             lvgl_port_unlock();
         }
     }
@@ -460,7 +541,7 @@ void ui_update_remote_mark(bool state)
     {
         if (lvgl_port_lock(0))
         {
-            lv_label_set_text_static(label_remote_state, str_empty);
+            lv_label_set_text_static(label_remote_state, "");
             lvgl_port_unlock();
         }
     }

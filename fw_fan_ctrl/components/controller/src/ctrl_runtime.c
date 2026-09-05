@@ -8,7 +8,7 @@
 #include "ctrl_runtime.h"
 #include "ctrl_output.h"
 
-const static char *TAG_CTRL = "ctrl_task";
+//const static char *TAG_CTRL = "ctrl_task";
 
 void ctrl_fsm_runtime(uint8_t channel, float speed, float period_sec)
 {

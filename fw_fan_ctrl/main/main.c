@@ -5,6 +5,7 @@
 #include "usb_tmc_init.h"
 #include "usb_tmc_process.h"
 #include "ctrl_runtime.h"
+#include "adq_cfg.h"
 
 // 1. Definir el tamaño en BYTES
 #define DISPLAY_TASK_STACK_SIZE 8 * 1024
@@ -24,6 +25,7 @@ void app_main(void)
     scpi_engine_init();
     tmc_hal_init();
     ctrl_init();
+    adq_system_init();
 
     // Creamos una tarea estatica para inicializar todos los modulos del sistema.
     xTaskCreatePinnedToCore(

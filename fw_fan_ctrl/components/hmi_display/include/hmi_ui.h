@@ -2,6 +2,7 @@
 #define HMI_UI_H_
 
 #include "ctrl_data.h"
+#include "adq_cfg.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -22,6 +23,8 @@ extern "C"
     void ui_update_value_max(float max);
     void ui_update_out_state(bool state);
     void ui_update_ctrl_type(ctrl_type_t type);
+    void ui_update_adq_trigger_source(adq_trigger_source_t source);
+    void ui_update_adq_state(adq_state_t state);
     void ui_update_error_mark(bool state);
     void ui_update_remote_mark(bool state);
     void ui_publish_update(void);

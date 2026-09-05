@@ -15,6 +15,7 @@
 #include "usb_tmc_process.h"
 #include "ctrl_data.h"
 #include "ctrl_sensor.h"
+#include "adq_cfg.h"
 #include "math.h"
 
 // --- Definición de Pines (Ajusta según tu placa) ---
@@ -155,6 +156,8 @@ void ui_task(void *pvParameter)
             ui_update_value_max(ctrl_get_duty_max(0));
             ui_update_out_state(ctrl_get_output_state(0));
             ui_update_ctrl_type(ctrl_get_controller_type(0));
+            ui_update_adq_trigger_source(ctrl_get_adq_trigger_source_value(0));
+            ui_update_adq_state(adq_get_state(0));
             ui_update_error_mark(tmc_scpi_has_errors());
             ui_update_remote_mark(tmc_scpi_has_connected());
         }

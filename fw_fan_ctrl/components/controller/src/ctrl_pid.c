@@ -5,7 +5,7 @@
 #include "ctrl_pid.h"
 #include "ctrl_data.h"
 
-static const char *TAG = "PID_ASYNC_S3";
+//static const char *TAG = "PID_ASYNC_S3";
 
 typedef enum PID_STATUS
 {
